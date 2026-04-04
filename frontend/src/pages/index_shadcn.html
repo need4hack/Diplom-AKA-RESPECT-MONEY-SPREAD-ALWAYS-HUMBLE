@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Shadcn UI</title>
+    <!-- Подключаем Tailwind CSS через CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключаем иконки Lucide (используются в Shadcn) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Подключаем шрифт Inter, который стандартно используется в Shadcn */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+        :root {
+            /* Цветовая палитра Shadcn по умолчанию */
+            --background: 0 0% 100%;
+            --foreground: 222.2 84% 4.9%;
+            --card: 0 0% 100%;
+            --card-foreground: 222.2 84% 4.9%;
+            --popover: 0 0% 100%;
+            --popover-foreground: 222.2 84% 4.9%;
+            --primary: 222.2 47.4% 11.2%;
+            --primary-foreground: 210 40% 98%;
+            --secondary: 210 40% 96.1%;
+            --secondary-foreground: 222.2 47.4% 11.2%;
+            --muted: 210 40% 96.1%;
+            --muted-foreground: 215.4 16.3% 46.9%;
+            --accent: 210 40% 96.1%;
+            --accent-foreground: 222.2 47.4% 11.2%;
+            --destructive: 0 84.2% 60.2%;
+            --destructive-foreground: 210 40% 98%;
+            --border: 214.3 31.8% 91.4%;
+            --input: 214.3 31.8% 91.4%;
+            --ring: 222.2 84% 4.9%;
+            --radius: 0.5rem;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: ["class"],
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: {
+                            DEFAULT: "hsl(var(--primary))",
+                            foreground: "hsl(var(--primary-foreground))",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(var(--secondary))",
+                            foreground: "hsl(var(--secondary-foreground))",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(var(--destructive))",
+                            foreground: "hsl(var(--destructive-foreground))",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(var(--muted))",
+                            foreground: "hsl(var(--muted-foreground))",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(var(--accent))",
+                            foreground: "hsl(var(--accent-foreground))",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(var(--popover))",
+                            foreground: "hsl(var(--popover-foreground))",
+                        },
+                        card: {
+                            DEFAULT: "hsl(var(--card))",
+                            foreground: "hsl(var(--card-foreground))",
+                        },
+                    },
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="flex h-screen overflow-hidden antialiased">
+
+    <!-- Sidebar (Шэдоу-версия: Border справа, приглушенные цвета, ховер эффекты) -->
+    <aside id="sidebar"
+        class="w-64 border-r border-border bg-background transition-all duration-300 flex flex-col hidden md:flex">
+        <div class="h-16 flex items-center px-6 border-b border-border justify-between">
+            <span class="font-bold text-lg tracking-tight uppercase">carspecs</span>
+            <button onclick="toggleSidebar()" class="text-muted-foreground hover:text-foreground transition-colors p-1"
+                title="Toggle Sidebar">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <!-- Активный пункт -->
+            <a href="index.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md bg-accent text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span class="sidebar-text">Dashboard</span>
+            </a>
+            <!-- Неактивные пункты -->
+            <a href="portal.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="layout-template" class="w-4 h-4"></i>
+                <span class="sidebar-text">Portal</span>
+            </a>
+            <a href="bulk-search.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="search" class="w-4 h-4"></i>
+                <span class="sidebar-text">Bulk Search</span>
+            </a>
+            <a href="vehicle-region.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                <span class="sidebar-text">Vehicle Region</span>
+            </a>
+            <a href="backbone.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="network" class="w-4 h-4"></i>
+                <span class="sidebar-text">Backbone</span>
+            </a>
+            <a href="users.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span class="sidebar-text">Users</span>
+            </a>
+            <a href="masters.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="briefcase" class="w-4 h-4"></i>
+                <span class="sidebar-text">Masters</span>
+            </a>
+            <a href="responses.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span class="sidebar-text">Responses</span>
+            </a>
+            <a href="vds.html"
+                class="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground font-medium text-sm transition-colors">
+                <i data-lucide="server" class="w-4 h-4"></i>
+                <span class="sidebar-text">VDS</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-muted/20">
+        <!-- Header -->
+        <header class="h-16 flex items-center justify-between px-6 py-4 border-b border-border bg-background">
+            <h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
+
+            <button
+                class="flex items-center gap-3 hover:bg-accent p-2 rounded-lg transition-colors border border-transparent hover:border-border">
+                <div
+                    class="w-9 h-9 rounded-full bg-muted overflow-hidden flex items-center justify-center border border-border">
+                    <img src="/иконки/png-klev-club-7n6v-p-litso-iz-robloksa-muzhskoe-png-2.png" alt="User"
+                        class="w-full h-full object-cover text-xs text-muted-foreground"
+                        onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'12\' cy=\'8\' r=\'5\'/><path d=\'M20 21a8 8 0 0 0-16 0\'/></svg>'">
+                </div>
+                <div class="flex flex-col text-left">
+                    <span class="text-sm font-medium leading-none">Stas</span>
+                    <span class="text-xs text-muted-foreground mt-1">Stas@gmail.com</span>
+                </div>
+            </button>
+        </header>
+
+        <!-- Main Body -->
+        <main class="flex-1 overflow-auto p-6 md:p-8">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+                <!-- Card 1: Queries -->
+                <div
+                    class="rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium">Queries</h3>
+                        <i data-lucide="search" class="w-4 h-4 text-muted-foreground"></i>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div class="text-2xl font-bold">0</div>
+                        <p class="text-xs text-muted-foreground mt-1">Today</p>
+
+                        <div class="mt-4 flex flex-row items-center gap-6 pt-4 border-t border-border/50">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">YD</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">TM</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">LM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: VD -->
+                <div
+                    class="rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium">VD</h3>
+                        <i data-lucide="box" class="w-4 h-4 text-muted-foreground"></i>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div class="text-2xl font-bold">0</div>
+                        <p class="text-xs text-muted-foreground mt-1">Today</p>
+
+                        <div class="mt-4 flex flex-row items-center gap-6 pt-4 border-t border-border/50">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">YD</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">TM</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">LM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: VV -->
+                <div
+                    class="rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium">VV</h3>
+                        <i data-lucide="car" class="w-4 h-4 text-muted-foreground"></i>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div class="text-2xl font-bold">0</div>
+                        <p class="text-xs text-muted-foreground mt-1">Today</p>
+
+                        <div class="mt-4 flex flex-row items-center gap-6 pt-4 border-t border-border/50">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">YD</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">TM</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">LM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4: VR -->
+                <div
+                    class="rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
+                    <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 class="tracking-tight text-sm font-medium">VR</h3>
+                        <i data-lucide="map" class="w-4 h-4 text-muted-foreground"></i>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <div class="text-2xl font-bold">0</div>
+                        <p class="text-xs text-muted-foreground mt-1">Today</p>
+
+                        <div class="mt-4 flex flex-row items-center gap-6 pt-4 border-t border-border/50">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">YD</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">TM</span>
+                            </div>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="text-sm font-medium leading-none">0</span>
+                                <span class="text-[10px] uppercase text-muted-foreground tracking-wider">LM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Инициализация иконок Lucide
+        lucide.createIcons();
+
+        // Логика переключения сайдбара
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const spans = sidebar.querySelectorAll('.sidebar-text');
+            const logoText = sidebar.querySelector('.uppercase');
+
+            if (sidebar.classList.contains('w-64')) {
+                sidebar.classList.replace('w-64', 'w-20');
+                spans.forEach(span => span.classList.add('hidden'));
+                logoText.classList.add('hidden');
+                sidebar.querySelectorAll('a').forEach(a => a.classList.add('justify-center'));
+                sidebar.querySelectorAll('a').forEach(a => a.classList.remove('px-3'));
+            } else {
+                sidebar.classList.replace('w-20', 'w-64');
+                spans.forEach(span => span.classList.remove('hidden'));
+                logoText.classList.remove('hidden');
+                sidebar.querySelectorAll('a').forEach(a => a.classList.remove('justify-center'));
+                sidebar.querySelectorAll('a').forEach(a => a.classList.add('px-3'));
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: carspecs_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-carspecs_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me}
+      POSTGRES_DB: carspecs_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-carspecs_admin} -d carspecs_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: carspecs_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/src/pages:/usr/share/nginx/html:ro
+    depends_on:
+      - auth_service
+      - vehicle_service
+      - vin_service
+      - valuation_service
+    restart: unless-stopped
+
+  auth_service:
+    build:
+      context: ./services/auth_service
+      dockerfile: Dockerfile
+    container_name: auth_service
+    command: gunicorn auth_service.wsgi:application --bind 0.0.0.0:8000 --workers 2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  vehicle_service:
+    build:
+      context: ./services/vehicle_service
+      dockerfile: Dockerfile
+    container_name: vehicle_service
+    command: gunicorn vehicle_service.wsgi:application --bind 0.0.0.0:8001 --workers 2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  vin_service:
+    build:
+      context: ./services/vin_service
+      dockerfile: Dockerfile
+    container_name: vin_service
+    command: gunicorn vin_service.wsgi:application --bind 0.0.0.0:8002 --workers 2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  valuation_service:
+    build:
+      context: ./services/valuation_service
+      dockerfile: Dockerfile
+    container_name: valuation_service
+    command: gunicorn valuation_service.wsgi:application --bind 0.0.0.0:8003 --workers 2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  elasticsearch:
+    image: elasticsearch:8.17.0
+    container_name: carspecs_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  es_data:

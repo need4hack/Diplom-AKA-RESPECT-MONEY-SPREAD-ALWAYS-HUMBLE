@@ -1,0 +1,93 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Git metadata / local backups
+.git_backup/
+frontend-next/.git/
+
+# Project docs and notes not related to the app
+*.md
+*.doc
+*.docx
+promts/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python
+**/__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+services/venv/
+autoevolution_scraper/venv/
+autoru_scraper/venv/
+
+# Node / Next
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+coverage/
+frontend-next/.runtime/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Databases
+*.sqlite3
+*.db
+*.db-journal
+*.jsonl
+
+# Scraper outputs and debug dumps
+autoevolution_scraper/
+autoru/
+autoru_data/
+autoru_scraper/
+autoru/catalog_scraper/autoru_data/
+autoru/catalog_scraper/error.html
+autoru/catalog_scraper/error.png
+autoru/catalog_scraper/debug_texts.txt
+autoru/catalog_scraper/smth.json
+autoevolution_scraper/*.html
+autoevolution_scraper/auto_specs.json
+autoru_scraper/*.json
+autoru_scraper/*.csv
+autoru_scraper/scraper.log
+
+# Misc
+*.tmp
+*.bak

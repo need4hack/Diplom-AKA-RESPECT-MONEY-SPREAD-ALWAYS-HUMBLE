@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarSpecs — Login</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f5f5f5;
+            font-family: 'Josefin Sans', sans-serif;
+        }
+
+        .auth-container {
+            width: 420px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .auth-header {
+            background: #000;
+            color: #fff;
+            padding: 24px 32px 16px;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            font-size: 1.6rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+        }
+
+        .auth-header p {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .auth-tabs button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            background: #fafafa;
+            font-family: inherit;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .auth-tabs button.active {
+            background: #fff;
+            border-bottom-color: #000;
+            font-weight: bold;
+        }
+
+        .auth-tabs button:hover:not(.active) {
+            background: #f0f0f0;
+        }
+
+        .auth-form {
+            padding: 28px 32px 32px;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .auth-form.active {
+            display: flex;
+        }
+
+        .auth-form label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: -8px;
+        }
+
+        .auth-form input {
+            padding: 12px 14px;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .auth-form input:focus {
+            outline: none;
+            border-color: #000;
+        }
+
+        .auth-btn {
+            padding: 14px;
+            background: #000;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 4px;
+        }
+
+        .auth-btn:hover {
+            background: #333;
+        }
+
+        .auth-btn:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+
+        /* ─── Status / Profile panel ─── */
+        .auth-status {
+            padding: 20px 32px 28px;
+            display: none;
+        }
+
+        .auth-status.active {
+            display: block;
+        }
+
+        .auth-status h3 {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+            font-size: 0.9rem;
+        }
+
+        .profile-grid dt {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .profile-grid dd {
+            margin: 0;
+            word-break: break-all;
+        }
+
+        .token-box {
+            margin-top: 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.75rem;
+            word-break: break-all;
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+
+        .logout-btn {
+            margin-top: 16px;
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .error-msg {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            min-height: 20px;
+        }
+
+        .success-msg {
+            color: #27ae60;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>CarSpecs</h1>
+            <p>Vehicle Valuation Platform</p>
+        </div>
+
+        <div class="auth-tabs" id="auth-tabs">
+            <button class="active" data-tab="login">Login</button>
+            <button data-tab="register">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <form class="auth-form active" id="form-login">
+            <label>Username</label>
+            <input type="text" id="login-username" placeholder="Enter username" required autocomplete="username">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="Enter password" required
+                autocomplete="current-password">
+            <div class="error-msg" id="login-error"></div>
+            <button type="submit" class="auth-btn" id="btn-login">Sign In</button>
+        </form>
+
+        <!-- Register Form -->
+        <form class="auth-form" id="form-register">
+            <label>Username</label>
+            <input type="text" id="reg-username" placeholder="min 3 characters" required autocomplete="username">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="you@example.com" required autocomplete="email">
+            <label>Password</label>
+            <input type="password" id="reg-password" placeholder="min 6 characters" required
+                autocomplete="new-password">
+            <div class="error-msg" id="reg-error"></div>
+            <button type="submit" class="auth-btn" id="btn-register">Create Account</button>
+        </form>
+
+        <!-- Profile (shown after login) -->
+        <div class="auth-status" id="profile-panel">
+            <h3 class="success-msg">✅ Authenticated</h3>
+            <dl class="profile-grid">
+                <dt>Username</dt>
+                <dd id="prof-username">—</dd>
+                <dt>Email</dt>
+                <dd id="prof-email">—</dd>
+                <dt>Role</dt>
+                <dd id="prof-role">—</dd>
+                <dt>API Key</dt>
+                <dd id="prof-apikey">—</dd>
+                <dt>Requests</dt>
+                <dd id="prof-requests">—</dd>
+                <dt>Registered</dt>
+                <dd id="prof-created">—</dd>
+            </dl>
+            <div class="token-box" id="token-display"></div>
+            <button class="logout-btn" id="btn-logout">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        const AUTH_API = 'http://127.0.0.1:8004/api/auth';
+
+        // ─── Tab switching ──────────────────────────────────
+        document.querySelectorAll('#auth-tabs button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#auth-tabs button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+                document.getElementById(`form-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        // ─── Login ──────────────────────────────────────────
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errEl = document.getElementById('login-error');
+            errEl.textContent = '';
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+
+            try {
+                const res = await fetch(`${AUTH_API}/login/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('login-username').value.trim(),
+                        password: document.getElementById('login-password').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+                showProfile(data.user, data.access);
+            } catch (err) {
+                errEl.textContent = err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+
+        // ─── Register ───────────────────────────────────────
+        document.getElementById('form-register').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errEl = document.getElementById('reg-error');
+            errEl.textContent = '';
+            const btn = document.getElementById('btn-register');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            try {
+                const res = await fetch(`${AUTH_API}/register/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('reg-username').value.trim(),
+                        email: document.getElementById('reg-email').value.trim(),
+                        password: document.getElementById('reg-password').value,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+                showProfile(data.user, data.access);
+            } catch (err) {
+                errEl.textContent = err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
+            }
+        });
+
+        // ─── Show profile panel ─────────────────────────────
+        function showProfile(user, token) {
+            document.getElementById('auth-tabs').style.display = 'none';
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+            document.getElementById('profile-panel').classList.add('active');
+
+            document.getElementById('prof-username').textContent = user.username;
+            document.getElementById('prof-email').textContent = user.email;
+            document.getElementById('prof-role').textContent = user.role;
+            document.getElementById('prof-apikey').textContent = user.api_key;
+            document.getElementById('prof-requests').textContent = `${user.request_count} / ${user.request_limit}`;
+            document.getElementById('prof-created').textContent = new Date(user.created_at).toLocaleDateString();
+            document.getElementById('token-display').textContent = `Bearer ${token}`;
+        }
+
+        // ─── Logout ─────────────────────────────────────────
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            document.getElementById('profile-panel').classList.remove('active');
+            document.getElementById('auth-tabs').style.display = 'flex';
+            document.getElementById('form-login').classList.add('active');
+        });
+
+        // ─── Auto-login on page load if token exists ────────
+        (async () => {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+            try {
+                const res = await fetch(`${AUTH_API}/me/`, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (!res.ok) throw new Error('Token expired');
+                const user = await res.json();
+                showProfile(user, token);
+            } catch {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+            }
+        })();
+    </script>
+</body>
+
+</html>
