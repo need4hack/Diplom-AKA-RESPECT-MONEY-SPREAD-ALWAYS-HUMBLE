@@ -20,11 +20,62 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 
 const SERVICE_MAP: Record<string, string> = {
-  vehicles:  process.env.VEHICLE_SERVICE_URL  || "http://127.0.0.1:8001",
-  vin:       process.env.VIN_SERVICE_URL      || "http://127.0.0.1:8002",
+  vehicles: process.env.VEHICLE_SERVICE_URL || "http://127.0.0.1:8001",
+  vin: process.env.VIN_SERVICE_URL || "http://127.0.0.1:8002",
   valuation: process.env.VALUATION_SERVICE_URL || "http://127.0.0.1:8003",
-  auth:      process.env.AUTH_SERVICE_URL      || "http://127.0.0.1:8000",
+  auth: process.env.AUTH_SERVICE_URL || "http://127.0.0.1:8004",
 };
+
+type JwtActor = {
+  userId: string | null;
+  username: string | null;
+  role: string | null;
+};
+
+function decodeBase64Url(value: string): string | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return Buffer.from(padded, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+function getJwtActor(req: NextRequest): JwtActor {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { userId: null, username: null, role: null };
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return { userId: null, username: null, role: null };
+  }
+
+  const payloadRaw = decodeBase64Url(parts[1]);
+  if (!payloadRaw) {
+    return { userId: null, username: null, role: null };
+  }
+
+  try {
+    const payload = JSON.parse(payloadRaw) as {
+      user_id?: string;
+      username?: string;
+      role?: string;
+      sub?: string;
+    };
+
+    return {
+      userId: payload.user_id ?? payload.sub ?? null,
+      username: payload.username ?? null,
+      role: payload.role ?? null,
+    };
+  } catch {
+    return { userId: null, username: null, role: null };
+  }
+}
 
 function getBackendUrl(path: string[]): string | null {
   if (path.length < 1) return null;
@@ -51,6 +102,7 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
   const fullUrl = url.search ? `${backendUrl}${url.search}` : backendUrl;
   const requestPath = `/api/${path.filter(Boolean).join("/")}/`;
   const startedAt = Date.now();
+  const actor = getJwtActor(req);
 
   try {
     // Forward headers (except host)
@@ -87,6 +139,9 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
         path: requestPath,
         status: response.status,
         duration_ms: durationMs,
+        user_id: actor.userId,
+        username: actor.username,
+        role: actor.role,
       });
     }
 
@@ -108,6 +163,9 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
         path: requestPath,
         status: 502,
         duration_ms: durationMs,
+        user_id: actor.userId,
+        username: actor.username,
+        role: actor.role,
       });
     }
 

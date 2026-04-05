@@ -19,7 +19,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/backbone":       "Backbone",
   "/users":          "Users",
   "/masters":        "Masters",
-  "/responses":      "Responses",
   "/vds":            "VDS",
   "/login":          "Login",
 };

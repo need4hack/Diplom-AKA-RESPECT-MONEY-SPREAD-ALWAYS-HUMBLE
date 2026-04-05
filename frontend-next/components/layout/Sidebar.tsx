@@ -13,7 +13,6 @@ import {
   FileText,
   Users,
   Settings,
-  History,
   Barcode,
   PanelLeftClose,
   PanelLeft,
@@ -29,7 +28,6 @@ export const NAV_ITEMS = [
   { href: "/backbone",       label: "Backbone",       icon: FileText },
   { href: "/users",          label: "Users",          icon: Users },
   { href: "/masters",        label: "Masters",        icon: Settings },
-  { href: "/responses",      label: "Responses",      icon: History },
   { href: "/vds",            label: "VDS",            icon: Barcode },
 ];
 
