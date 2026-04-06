@@ -4,7 +4,13 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Menu } from "lucide-react";
 import Link from "next/link";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { NAV_ITEMS } from "./Sidebar";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -45,6 +51,9 @@ export default function TopBar() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] p-0 bg-zinc-950 border-zinc-800 text-zinc-300">
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+            <SheetDescription className="sr-only">
+              Main application navigation for dashboard and admin sections.
+            </SheetDescription>
             <div className="flex items-center px-6 h-14 border-b border-zinc-800">
               <span className="text-lg font-bold tracking-wider text-white uppercase">
                 carspecs

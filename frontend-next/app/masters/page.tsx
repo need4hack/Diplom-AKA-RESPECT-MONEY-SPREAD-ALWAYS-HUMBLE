@@ -6,7 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import DataTable, { type Column } from "@/components/data-table/DataTable";
 import { Pencil, Trash2, Plus, Save } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 /* ─── types ───────────────────────────────────────────────── */
@@ -75,6 +82,9 @@ export default function MastersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Master Record</DialogTitle>
+            <DialogDescription>
+              Add a new configuration entry for valuation, VIN, or auth settings.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="space-y-1">

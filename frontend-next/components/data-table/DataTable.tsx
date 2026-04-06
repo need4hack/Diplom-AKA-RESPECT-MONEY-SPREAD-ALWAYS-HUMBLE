@@ -30,6 +30,8 @@ interface DataTableProps<T> {
   data: T[];
   totalRecords?: number;
   searchPlaceholder?: string;
+  searchInputClassName?: string;
+  showTopPagination?: boolean;
   onSearch?: (query: string) => void;
   onCreate?: () => void;
   page?: number;
@@ -55,6 +57,8 @@ export default function DataTable<T extends object>({
   data,
   totalRecords = 0,
   searchPlaceholder = "Search...",
+  searchInputClassName,
+  showTopPagination = false,
   onSearch,
   onCreate,
   page = 1,
@@ -103,11 +107,35 @@ export default function DataTable<T extends object>({
     }
   }
 
+  const paginationControls = (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page <= 1}
+        onClick={() => onPageChange?.(page - 1)}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-sm text-zinc-600">
+        Page {page} of {totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages}
+        onClick={() => onPageChange?.(page + 1)}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {onSearch && (
             <>
               <Input
@@ -115,13 +143,14 @@ export default function DataTable<T extends object>({
                 onChange={(e) => setSearchValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={searchPlaceholder}
-                className="w-64"
+                className={`w-64 ${searchInputClassName ?? ""}`}
               />
               <Button variant="secondary" size="sm" onClick={handleSearch}>
                 <Search className="h-4 w-4" />
               </Button>
             </>
           )}
+          {showTopPagination && paginationControls}
           {title && (
             <span className="text-sm text-zinc-500 ml-2">
               Total: {totalRecords.toLocaleString()}
@@ -218,17 +247,7 @@ export default function DataTable<T extends object>({
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-zinc-600">
-            Page {page} of {totalPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {paginationControls}
         <Select value={String(pageSize)} onValueChange={(val) => onPageSizeChange?.(Number(val))}>
           <SelectTrigger className="h-8 w-[70px]">
             <SelectValue placeholder={String(pageSize)} />

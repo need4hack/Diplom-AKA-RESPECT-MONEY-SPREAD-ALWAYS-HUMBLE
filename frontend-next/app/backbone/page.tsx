@@ -153,6 +153,8 @@ export default function BackbonePage() {
           data={loading ? [] : data}
           totalRecords={totalRecords}
           searchPlaceholder="Smart Search (ex: '2020 sedan bmw')"
+          searchInputClassName="focus-visible:ring-0 focus-visible:ring-transparent focus-visible:shadow-none"
+          showTopPagination={true}
           onSearch={handleSearch}
           page={page}
           pageSize={pageSize}
