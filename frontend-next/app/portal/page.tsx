@@ -225,7 +225,7 @@ export default function PortalPage() {
               {cascade.foundVehicle && (
                 <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
                   <p className="text-sm font-medium text-emerald-800">
-                    ✅ Found: {cascade.foundVehicle.year} {cascade.foundVehicle.make}{" "}
+                    Found: {cascade.foundVehicle.year} {cascade.foundVehicle.make}{" "}
                     {cascade.foundVehicle.model} {cascade.foundVehicle.trim}
                   </p>
                   <p className="text-xs text-emerald-600 mt-1">

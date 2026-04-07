@@ -215,7 +215,7 @@ export async function getDashboardStats(
 }
 
 export async function getDashboardActivity(
-  limit = 10
+  limit?: number
 ): Promise<DashboardActivityResponse> {
   const logs = await readRequestLogs();
   const sortedLogs = [...logs].sort((left, right) => {
@@ -249,7 +249,10 @@ export async function getDashboardActivity(
     .sort((left, right) => right.requests - left.requests)
     .slice(0, 5);
 
-  const recentRequests = sortedLogs.slice(0, limit).map((log, index) => ({
+  const logsForActivity =
+    typeof limit === "number" ? sortedLogs.slice(0, limit) : sortedLogs;
+
+  const recentRequests = logsForActivity.map((log, index) => ({
     id: `${log.timestamp}-${log.method}-${log.path}-${index}`,
     timestamp: log.timestamp,
     endpoint: log.path,

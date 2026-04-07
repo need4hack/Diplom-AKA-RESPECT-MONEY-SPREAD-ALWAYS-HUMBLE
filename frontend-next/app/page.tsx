@@ -7,6 +7,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import RecentRequestsTable from "@/components/dashboard/RecentRequestsTable";
 import {
   Card,
   CardContent,
@@ -14,14 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   getDashboardActivity,
   getDashboardStats,
@@ -49,44 +42,14 @@ const CARD_DESCRIPTIONS: Record<DashboardCardStat["key"], string> = {
   vr: "Vehicle catalog requests",
 };
 
-function formatRequestTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 function formatPercentage(value: number): string {
   return `${value.toFixed(1)}%`;
-}
-
-function getMethodBadgeVariant(method: string): "default" | "secondary" {
-  return method === "POST" ? "default" : "secondary";
-}
-
-function getStatusBadgeVariant(status: number): "default" | "destructive" | "secondary" {
-  if (status >= 400) {
-    return "destructive";
-  }
-
-  if (status >= 300) {
-    return "secondary";
-  }
-
-  return "default";
 }
 
 export default async function DashboardPage() {
   const [stats, activity] = await Promise.all([
     getDashboardStats(),
-    getDashboardActivity(12),
+    getDashboardActivity(),
   ]);
 
   const successRate =
@@ -141,64 +104,12 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-zinc-100">
-                  <TableHead>Time</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activity.recent_requests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-sm text-zinc-500">
-                      No API requests logged yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  activity.recent_requests.map((request) => (
-                    <TableRow key={request.id} className="border-zinc-100">
-                      <TableCell className="text-sm text-zinc-600">
-                        {formatRequestTime(request.timestamp)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-zinc-900">{request.user}</span>
-                          <span className="text-xs text-zinc-500">
-                            {request.role ?? "no role"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getMethodBadgeVariant(request.method)}>
-                          {request.method}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[320px] truncate font-mono text-xs text-zinc-700">
-                        {request.endpoint}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(request.status)}>
-                          {request.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-zinc-700">
-                        {request.duration_ms} ms
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <RecentRequestsTable requests={activity.recent_requests} />
           </CardContent>
         </Card>
 
-        <div className="grid gap-4">
-          <Card className="border-zinc-200/80 bg-white">
+        <div className="grid content-start gap-4 self-start">
+          <Card className="h-fit border-zinc-200/80 bg-white">
             <CardHeader className="pb-3">
               <CardTitle>Request Health</CardTitle>
               <CardDescription>Admin-side API quality snapshot.</CardDescription>
@@ -241,7 +152,7 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-200/80 bg-white">
+          <Card className="h-fit border-zinc-200/80 bg-white">
             <CardHeader className="pb-3">
               <CardTitle>Top Requesters</CardTitle>
               <CardDescription>Who is generating the most traffic now.</CardDescription>
@@ -275,7 +186,7 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-200/80 bg-zinc-950 text-white shadow-none ring-zinc-900/10">
+          <Card className="h-fit border-zinc-200/80 bg-zinc-950 text-white shadow-none ring-zinc-900/10">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-zinc-300" />
