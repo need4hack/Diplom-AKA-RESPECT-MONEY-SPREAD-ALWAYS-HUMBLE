@@ -48,6 +48,12 @@ export default function PortalPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (isNew) {
+      setMileage(0);
+    }
+  }, [isNew]);
+
   /* ── VIN Decode ──────────────────────────────────────────── */
 
   async function handleVinDecode() {
@@ -110,7 +116,11 @@ export default function PortalPage() {
     setValuationLoading(true);
 
     try {
-      const result = await valuationApi.calculate(cascade.foundVehicle.id, mileage);
+      const result = await valuationApi.calculate(
+        cascade.foundVehicle.id,
+        mileage,
+        isNew
+      );
       setValuationResult(result);
       toast.success("Valuation calculated");
     } catch (err: unknown) {
@@ -135,7 +145,7 @@ export default function PortalPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs text-zinc-500">VIN</label>
+                <label className="text-xs text-muted-foreground">VIN</label>
                 <Input
                   value={vinValue}
                   onChange={(e) => setVinValue(e.target.value.toUpperCase())}
@@ -145,13 +155,20 @@ export default function PortalPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-zinc-500">Mileage (km)</label>
+                <label className="text-xs text-muted-foreground">Mileage (km)</label>
                 <Input
                   type="number"
                   value={mileage}
                   onChange={(e) => setMileage(Number(e.target.value))}
                   min={0}
+                  disabled={isNew}
+                  className={isNew ? "bg-muted text-muted-foreground" : undefined}
                 />
+                {isNew && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Mileage is locked to 0 for new vehicles.
+                  </p>
+                )}
               </div>
               <Button
                 onClick={handleVinDecode}
@@ -187,14 +204,14 @@ export default function PortalPage() {
 
                   return (
                     <div key={field.key} className="space-y-1">
-                      <label className="text-xs text-zinc-500">{field.label}</label>
+                      <label className="text-xs text-muted-foreground">{field.label}</label>
                       <Select
                         key={`${field.key}-${fieldOptions.length ? 'loaded' : 'empty'}`}
                         value={fieldValue || undefined}
                         onValueChange={(val) => cascade.selectField(index, val)}
                         disabled={isDisabled}
                       >
-                        <SelectTrigger className="w-full h-9 bg-white">
+                        <SelectTrigger className="h-9 w-full bg-background">
                           <SelectValue placeholder={isLoading ? "Loading..." : `— ${field.placeholder} —`} />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
@@ -211,24 +228,24 @@ export default function PortalPage() {
 
                 {/* Est. Mileage (read-only output) */}
                 <div className="space-y-1">
-                  <label className="text-xs text-zinc-500">Est. Mileage</label>
+                  <label className="text-xs text-muted-foreground">Est. Mileage</label>
                   <Input
                     type="number"
                     value={valuationResult?.avg_mileage ?? 0}
                     readOnly
-                    className="bg-zinc-50"
+                    className="bg-muted/60"
                   />
                 </div>
               </div>
 
               {/* Found vehicle indicator */}
               {cascade.foundVehicle && (
-                <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <p className="text-sm font-medium text-emerald-800">
+                <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                     Found: {cascade.foundVehicle.year} {cascade.foundVehicle.make}{" "}
                     {cascade.foundVehicle.model} {cascade.foundVehicle.trim}
                   </p>
-                  <p className="text-xs text-emerald-600 mt-1">
+                  <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300">
                     ID: {cascade.foundVehicle.id} • Today: {formatCurrency(cascade.foundVehicle.today_price)} • New: {formatCurrency(cascade.foundVehicle.new_price)}
                   </p>
                 </div>
@@ -245,7 +262,7 @@ export default function PortalPage() {
               <div className="flex flex-wrap items-center gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <Switch checked={isNew} onCheckedChange={setIsNew} />
-                  <label className="text-sm text-zinc-600">Is New?</label>
+                  <label className="text-sm text-muted-foreground">Is New?</label>
                 </div>
                 <Button
                   onClick={handleValuate}
@@ -269,38 +286,38 @@ export default function PortalPage() {
                 </div>
               ) : valuationResult ? (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-emerald-600 sm:mb-1">HIGH</p>
-                    <p className="text-lg sm:text-xl font-bold text-emerald-700 tracking-tight">
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:mb-1">HIGH</p>
+                    <p className="text-lg sm:text-xl font-bold tracking-tight text-emerald-700 dark:text-emerald-300">
                       {formatCurrency(valuationResult.high)}
                     </p>
                   </div>
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-amber-50 border border-amber-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-amber-600 sm:mb-1">MEDIUM</p>
-                    <p className="text-lg sm:text-xl font-bold text-amber-700 tracking-tight">
+                  <div className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 sm:mb-1">MEDIUM</p>
+                    <p className="text-lg sm:text-xl font-bold tracking-tight text-amber-700 dark:text-amber-300">
                       {formatCurrency(valuationResult.medium)}
                     </p>
                   </div>
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-red-50 border border-red-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-red-600 sm:mb-1">LOW</p>
-                    <p className="text-lg sm:text-xl font-bold text-red-700 tracking-tight">
+                  <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-red-700 dark:text-red-400 sm:mb-1">LOW</p>
+                    <p className="text-lg sm:text-xl font-bold tracking-tight text-red-700 dark:text-red-300">
                       {formatCurrency(valuationResult.low)}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 opacity-50">
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-zinc-50 border border-zinc-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-zinc-500 sm:mb-1">HIGH</p>
-                    <p className="text-lg sm:text-xl font-bold text-zinc-400">$0</p>
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-muted-foreground sm:mb-1">HIGH</p>
+                    <p className="text-lg sm:text-xl font-bold text-muted-foreground">$0</p>
                   </div>
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-zinc-50 border border-zinc-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-zinc-500 sm:mb-1">MEDIUM</p>
-                    <p className="text-lg sm:text-xl font-bold text-zinc-400">$0</p>
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-muted-foreground sm:mb-1">MEDIUM</p>
+                    <p className="text-lg sm:text-xl font-bold text-muted-foreground">$0</p>
                   </div>
-                  <div className="text-center p-3 sm:p-4 rounded-lg bg-zinc-50 border border-zinc-200 flex sm:block justify-between items-center sm:items-start">
-                    <p className="text-xs font-medium text-zinc-500 sm:mb-1">LOW</p>
-                    <p className="text-lg sm:text-xl font-bold text-zinc-400">$0</p>
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-3 text-center sm:block sm:items-start sm:p-4">
+                    <p className="text-xs font-medium text-muted-foreground sm:mb-1">LOW</p>
+                    <p className="text-lg sm:text-xl font-bold text-muted-foreground">$0</p>
                   </div>
                 </div>
               )}
@@ -309,19 +326,19 @@ export default function PortalPage() {
               {valuationResult && (
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <span className="text-zinc-400">Age:</span>{" "}
+                    <span className="text-muted-foreground">Age:</span>{" "}
                     <span className="font-medium">{valuationResult.age} yrs</span>
                   </div>
                   <div>
-                    <span className="text-zinc-400">Depreciation:</span>{" "}
+                    <span className="text-muted-foreground">Depreciation:</span>{" "}
                     <span className="font-medium">{valuationResult.depreciation_rate}%</span>
                   </div>
                   <div>
-                    <span className="text-zinc-400">Avg Mileage:</span>{" "}
+                    <span className="text-muted-foreground">Avg Mileage:</span>{" "}
                     <span className="font-medium">{valuationResult.avg_mileage.toLocaleString()} km</span>
                   </div>
                   <div>
-                    <span className="text-zinc-400">Mileage Adj:</span>{" "}
+                    <span className="text-muted-foreground">Mileage Adj:</span>{" "}
                     <Badge variant={valuationResult.mileage_delta > 0 ? "destructive" : "default"}>
                       {valuationResult.mileage_delta > 0 ? "-" : "+"}{formatCurrency(valuationResult.mileage_adjustment)}
                     </Badge>

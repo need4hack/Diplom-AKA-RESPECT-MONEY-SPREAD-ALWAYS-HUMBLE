@@ -61,8 +61,8 @@ export default function UsersPage() {
         rowKey={(r) => r.id}
         actions={(row) => (
           <div className="flex items-center gap-1">
-            <button className="p-1 hover:bg-zinc-100 rounded" title="Edit"><Pencil className="h-3.5 w-3.5 text-zinc-500" /></button>
-            <button className="p-1 hover:bg-red-50 rounded" title="Delete"><Trash2 className="h-3.5 w-3.5 text-red-500" /></button>
+            <button className="rounded p-1 hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button className="rounded p-1 hover:bg-destructive/10" title="Delete"><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>
           </div>
         )}
       />

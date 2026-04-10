@@ -41,7 +41,7 @@ const columns: Column<VdsRecord>[] = [
   { key: "new_price", header: "New Price", render: (r) => r.new_price?.toLocaleString() },
   { key: "today_price", header: "Today Price", render: (r) => r.today_price?.toLocaleString() },
   { key: "is_active", header: "Active", render: (r) => (
-    <span className={r.is_active ? "text-emerald-600" : "text-zinc-400"}>{r.is_active ? "✓" : "✗"}</span>
+    <span className={r.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>{r.is_active ? "✓" : "✗"}</span>
   )},
 ];
 
@@ -76,9 +76,9 @@ export default function VdsPage() {
         rowKey={(r) => r.id}
         actions={(row) => (
           <div className="flex items-center gap-1">
-            <button className="p-1 hover:bg-zinc-100 rounded" title="Edit"><Pencil className="h-3.5 w-3.5 text-zinc-500" /></button>
-            <button className="p-1 hover:bg-zinc-100 rounded" title="Copy"><Copy className="h-3.5 w-3.5 text-zinc-500" /></button>
-            <button className="p-1 hover:bg-red-50 rounded" title="Delete"><Trash2 className="h-3.5 w-3.5 text-red-500" /></button>
+            <button className="rounded p-1 hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button className="rounded p-1 hover:bg-muted" title="Copy"><Copy className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button className="rounded p-1 hover:bg-destructive/10" title="Delete"><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>
           </div>
         )}
       />

@@ -117,7 +117,7 @@ export default function DataTable<T extends object>({
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="text-sm text-zinc-600">
+      <span className="text-sm text-muted-foreground">
         Page {page} of {totalPages}
       </span>
       <Button
@@ -152,7 +152,7 @@ export default function DataTable<T extends object>({
           )}
           {showTopPagination && paginationControls}
           {title && (
-            <span className="text-sm text-zinc-500 ml-2">
+            <span className="ml-2 text-sm text-muted-foreground">
               Total: {totalRecords.toLocaleString()}
             </span>
           )}
@@ -168,10 +168,10 @@ export default function DataTable<T extends object>({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-white overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
-            <TableRow className="bg-zinc-50">
+            <TableRow className="bg-muted/40">
               {selectable && (
                 <TableHead className="w-12 text-center items-center">
                   <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
@@ -207,8 +207,8 @@ export default function DataTable<T extends object>({
                 <TableCell colSpan={columns.length + (actions ? 1 : 0) + (selectable ? 1 : 0)} className="h-48 text-center">
                   <EmptyPlaceholder
                     icon={
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                        <FileQuestion className="h-6 w-6 text-zinc-400" />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                        <FileQuestion className="h-6 w-6 text-muted-foreground" />
                       </div>
                     }
                     title="No records found"
@@ -223,7 +223,7 @@ export default function DataTable<T extends object>({
                 const isSelected = selectedRowKeys.includes(rKey);
                 
                 return (
-                  <TableRow key={rKey} className={`hover:bg-zinc-50 ${isSelected ? "bg-zinc-50" : ""}`}>
+                  <TableRow key={rKey} className={`hover:bg-muted/50 ${isSelected ? "bg-muted/50" : ""}`}>
                     {selectable && (
                        <TableCell className="w-12 text-center items-center">
                          <Checkbox checked={isSelected} onCheckedChange={() => handleSelectRow(rKey)} />

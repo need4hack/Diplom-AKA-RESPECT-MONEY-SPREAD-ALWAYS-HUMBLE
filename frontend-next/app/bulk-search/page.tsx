@@ -68,8 +68,7 @@ export default function BulkSearchPage() {
             onChange={(e) => setVinList(e.target.value)}
             placeholder={"Paste VINs here, one per line:\nWVWZZZAUZNP000001\n1FTFW1E50NFA00002\n..."}
             rows={12}
-            className="w-full rounded-md border border-zinc-200 bg-white p-3 text-sm font-mono
-                       placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400 resize-none"
+            className="w-full resize-none rounded-md border border-input bg-background p-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
           />
           <div className="flex gap-2">
             <Button onClick={handleBulkSearch} disabled={loading} className="flex-1">
@@ -92,13 +91,13 @@ export default function BulkSearchPage() {
         </CardHeader>
         <CardContent>
           {results.length === 0 ? (
-            <p className="text-sm text-zinc-400 text-center py-8">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No results yet. Paste VINs and click "Process VINs".
             </p>
           ) : (
             <div className="max-h-[400px] overflow-y-auto space-y-2">
               {results.map((r, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded border border-zinc-100 hover:bg-zinc-50 text-sm">
+                <div key={i} className="flex items-center justify-between rounded border border-border p-2 text-sm hover:bg-muted/50">
                   <span className="font-mono text-xs">{r.vin}</span>
                   <Badge variant={r.status === "found" ? "default" : r.status === "error" ? "destructive" : "secondary"}>
                     {r.status}

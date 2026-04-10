@@ -280,7 +280,7 @@ export default function RecentRequestsTable({
     <div className="space-y-4">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <span className="text-sm text-zinc-500">
+          <span className="text-sm text-muted-foreground">
             Total logged requests: {filteredRequests.length.toLocaleString()}
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -296,7 +296,7 @@ export default function RecentRequestsTable({
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-zinc-600">
+            <span className="text-sm text-muted-foreground">
               Page {page} of {totalPages}
             </span>
             <Button
@@ -363,15 +363,15 @@ export default function RecentRequestsTable({
             <PopoverContent align="start" className="w-[360px]">
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-zinc-900">Date range</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-sm font-medium text-foreground">Date range</p>
+                  <p className="text-xs text-muted-foreground">
                     Filter requests by start and end date/time.
                   </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">From date</label>
+                    <label className="text-xs font-medium text-muted-foreground">From date</label>
                     <Input
                       type="date"
                       value={fromDate}
@@ -380,7 +380,7 @@ export default function RecentRequestsTable({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">From time</label>
+                    <label className="text-xs font-medium text-muted-foreground">From time</label>
                     <Input
                       type="time"
                       value={fromTime}
@@ -389,7 +389,7 @@ export default function RecentRequestsTable({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">To date</label>
+                    <label className="text-xs font-medium text-muted-foreground">To date</label>
                     <Input
                       type="date"
                       value={toDate}
@@ -398,7 +398,7 @@ export default function RecentRequestsTable({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">To time</label>
+                    <label className="text-xs font-medium text-muted-foreground">To time</label>
                     <Input
                       type="time"
                       value={toTime}
@@ -421,7 +421,7 @@ export default function RecentRequestsTable({
 
       <Table>
         <TableHeader>
-          <TableRow className="border-zinc-100">
+          <TableRow className="border-border">
             <TableHead>Time</TableHead>
             <TableHead>User</TableHead>
             <TableHead>Method</TableHead>
@@ -433,20 +433,20 @@ export default function RecentRequestsTable({
         <TableBody>
           {paginatedRequests.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-sm text-zinc-500">
+              <TableCell colSpan={6} className="h-32 text-center text-sm text-muted-foreground">
                 No API requests matched the current filters.
               </TableCell>
             </TableRow>
           ) : (
             paginatedRequests.map((request) => (
-              <TableRow key={request.id} className="border-zinc-100">
-                <TableCell className="text-sm text-zinc-600">
+              <TableRow key={request.id} className="border-border">
+                <TableCell className="text-sm text-muted-foreground">
                   {formatRequestTime(request.timestamp)}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-medium text-zinc-900">{request.user}</span>
-                    <span className="text-xs text-zinc-500">
+                    <span className="font-medium text-foreground">{request.user}</span>
+                    <span className="text-xs text-muted-foreground">
                       {request.role ?? "no role"}
                     </span>
                   </div>
@@ -456,7 +456,7 @@ export default function RecentRequestsTable({
                     {request.method}
                   </Badge>
                 </TableCell>
-                <TableCell className="max-w-[320px] truncate font-mono text-xs text-zinc-700">
+                <TableCell className="max-w-[320px] truncate font-mono text-xs text-foreground/80">
                   {request.endpoint}
                 </TableCell>
                 <TableCell>
@@ -464,7 +464,7 @@ export default function RecentRequestsTable({
                     {request.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium text-zinc-700">
+                <TableCell className="text-right font-medium text-foreground/80">
                   {request.duration_ms} ms
                 </TableCell>
               </TableRow>

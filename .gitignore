@@ -87,6 +87,8 @@ autoevolution_scraper/auto_specs.json
 autoru_scraper/*.json
 autoru_scraper/*.csv
 autoru_scraper/scraper.log
+autoru_fast_scraper/
+designs
 
 # Misc
 *.tmp

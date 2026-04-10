@@ -156,26 +156,34 @@ class ValuationService:
             depreciation_rate = rate if rate is not None else 0
 
         # 4. Mileage adjustment
-        mileage_cat = ValuationService.get_mileage_category(vehicle)
-
-        avg_yearly_str = mileage_cat.maileage_per_year or '0'
-        digits_only = re.sub(r'[^\d]', '', str(avg_yearly_str))
-        avg_yearly = int(digits_only) if digits_only else 0
-
-        avg_mileage = avg_yearly * max(age, 1)
-        mileage_delta = actual_mileage - avg_mileage
-
-        if mileage_delta > 0:
-            cpkm = mileage_cat.cpkm_plus or 0
+        if is_new:
+            avg_mileage = 0
+            actual_mileage = 0
+            mileage_delta = 0
+            mileage_adjustment = 0
         else:
-            cpkm = mileage_cat.cpkm_minus or 0
+            mileage_cat = ValuationService.get_mileage_category(vehicle)
 
-        mileage_adjustment = round(cpkm * abs(mileage_delta))
+            avg_yearly_str = mileage_cat.maileage_per_year or '0'
+            digits_only = re.sub(r'[^\d]', '', str(avg_yearly_str))
+            avg_yearly = int(digits_only) if digits_only else 0
+
+            avg_mileage = avg_yearly * max(age, 1)
+            mileage_delta = actual_mileage - avg_mileage
+
+            if mileage_delta > 0:
+                cpkm = mileage_cat.cpkm_plus or 0
+            else:
+                cpkm = mileage_cat.cpkm_minus or 0
+
+            mileage_adjustment = round(cpkm * abs(mileage_delta))
 
         # 5. Core formula
         depreciated_price = today_price * (1 - depreciation_rate / 100)
 
-        if mileage_delta > 0:
+        if is_new:
+            medium = depreciated_price
+        elif mileage_delta > 0:
             # High mileage penalty cap (car retains at least 10% of depreciated value)
             max_penalty = depreciated_price * 0.90
             mileage_adjustment = min(mileage_adjustment, max_penalty)

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User, Menu } from "lucide-react";
 import Link from "next/link";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 import {
   Sheet,
   SheetContent,
@@ -39,12 +40,12 @@ export default function TopBar() {
   const title = PAGE_TITLES[pathname] ?? "CarSpecs";
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 sm:px-6 bg-white border-b border-zinc-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 sm:px-6 border-b border-border bg-background">
       <div className="flex items-center gap-4">
         {/* Mobile Hamburger Menu */}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <button className="md:hidden p-1.5 rounded-md hover:bg-zinc-100 text-zinc-600 transition-colors">
+            <button className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden">
               <Menu size={20} />
               <span className="sr-only">Toggle Menu</span>
             </button>
@@ -84,28 +85,29 @@ export default function TopBar() {
         </Sheet>
 
         {/* Page title */}
-        <h1 className="text-lg font-semibold text-zinc-900">{title}</h1>
+        <h1 className="text-lg font-semibold text-foreground">{title}</h1>
       </div>
 
       {/* User area */}
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         {user ? (
           <>
             {/* Avatar circle */}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center border border-zinc-200">
-                <User size={16} className="text-zinc-600" />
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border">
+                <User size={16} className="text-muted-foreground" />
               </div>
               <div className="hidden sm:block text-right leading-tight">
-                <p className="text-sm font-medium text-zinc-900">{user.username}</p>
-                <p className="text-[11px] text-zinc-500">{user.email}</p>
+                <p className="text-sm font-medium text-foreground">{user.username}</p>
+                <p className="text-[11px] text-muted-foreground">{user.email}</p>
               </div>
             </div>
 
             {/* Logout */}
             <button
               onClick={logout}
-              className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors ml-1"
+              className="ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="Logout"
             >
               <LogOut size={18} />
@@ -114,7 +116,7 @@ export default function TopBar() {
         ) : (
           <Link
             href="/login"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Sign in
           </Link>

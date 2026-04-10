@@ -26,7 +26,7 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
   const [selectedBodies, setSelectedBodies] = useState<Set<string>>(new Set());
   const [yearRange, setYearRange] = useState<[number, number]>([2000, 2025]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
-  const [isActive, setIsActive] = useState<boolean>(true);
+  const [isActive, setIsActive] = useState<boolean>(false);
 
   // Fetch filter options once
   useEffect(() => {
@@ -80,6 +80,7 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
           onClick={() => {
             setSelectedMakes(new Set()); setSelectedBodies(new Set());
             setYearRange([2000, 2025]); setPriceRange([0, 500000]);
+            setIsActive(false);
           }}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
@@ -135,7 +136,7 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
           <AccordionContent>
             <div className="space-y-3 pt-2 overflow-y-auto pr-2 custom-scrollbar" style={{ height: '350px' }}>
               {makes.length === 0 ? (
-                <div className="text-sm text-zinc-500 animate-pulse">Loading makes...</div>
+                <div className="text-sm text-muted-foreground animate-pulse">Loading makes...</div>
               ) : (
                 makes.slice(0, 200).map((make) => (
                   <div key={make} className="flex items-center space-x-2">
@@ -159,7 +160,7 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
           <AccordionContent>
             <div className="space-y-3 pt-2 overflow-y-auto pr-2 custom-scrollbar" style={{ height: '350px' }}>
               {bodies.length === 0 ? (
-                <div className="text-sm text-zinc-500 animate-pulse">Loading body types...</div>
+                <div className="text-sm text-muted-foreground animate-pulse">Loading body types...</div>
               ) : (
                 bodies.map((body) => (
                   <div key={body} className="flex items-center space-x-2">

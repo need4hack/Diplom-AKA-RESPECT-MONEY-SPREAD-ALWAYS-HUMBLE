@@ -243,9 +243,13 @@ export interface ValuationResult {
 }
 
 export const valuation = {
-  calculate: (vehicleId: number, mileage: number) =>
+  calculate: (vehicleId: number, mileage: number, isNew = false) =>
     request<ValuationResult>("/api/valuation/calculate", {
       method: "POST",
-      body: JSON.stringify({ vehicle_id: vehicleId, actual_mileage: mileage }),
+      body: JSON.stringify({
+        vehicle_id: vehicleId,
+        actual_mileage: mileage,
+        is_new: isNew,
+      }),
     }),
 };

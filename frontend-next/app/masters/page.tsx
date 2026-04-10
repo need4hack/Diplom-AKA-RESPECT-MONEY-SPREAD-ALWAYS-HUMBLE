@@ -33,7 +33,7 @@ const columns: Column<MasterRecord>[] = [
   { key: "category", header: "Category" },
   { key: "key", header: "Key", className: "font-mono text-sm" },
   { key: "value", header: "Value" },
-  { key: "description", header: "Description", className: "text-xs text-zinc-500" },
+  { key: "description", header: "Description", className: "text-xs text-muted-foreground" },
 ];
 
 /* ─── mock data ───────────────────────────────────────────── */
@@ -71,8 +71,8 @@ export default function MastersPage() {
         rowKey={(r) => r.id}
         actions={(row) => (
           <div className="flex items-center gap-1">
-            <button className="p-1 hover:bg-zinc-100 rounded" title="Edit"><Pencil className="h-3.5 w-3.5 text-zinc-500" /></button>
-            <button className="p-1 hover:bg-red-50 rounded" title="Delete"><Trash2 className="h-3.5 w-3.5 text-red-500" /></button>
+            <button className="rounded p-1 hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button className="rounded p-1 hover:bg-destructive/10" title="Delete"><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>
           </div>
         )}
       />
@@ -88,19 +88,19 @@ export default function MastersPage() {
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <div className="space-y-1">
-              <label className="text-sm text-zinc-600">Category</label>
+              <label className="text-sm text-muted-foreground">Category</label>
               <Input placeholder="e.g. Valuation, VIN, Auth" />
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-zinc-600">Key</label>
+              <label className="text-sm text-muted-foreground">Key</label>
               <Input placeholder="e.g. MAX_AGE_YEARS" className="font-mono" />
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-zinc-600">Value</label>
+              <label className="text-sm text-muted-foreground">Value</label>
               <Input placeholder="e.g. 30" />
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-zinc-600">Description</label>
+              <label className="text-sm text-muted-foreground">Description</label>
               <Input placeholder="Brief description" />
             </div>
             <Button className="w-full" onClick={() => { toast.success("Record created"); setDialogOpen(false); }}>

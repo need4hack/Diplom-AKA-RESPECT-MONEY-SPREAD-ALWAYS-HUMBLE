@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DataTable, { type Column } from "@/components/data-table/DataTable";
+import { Badge } from "@/components/ui/badge";
 
 /* ─── types ───────────────────────────────────────────────── */
 
@@ -17,6 +18,7 @@ interface BackboneRecord {
   new_price: number;
   today_price: number;
   source: string;
+  is_active: boolean;
 }
 
 /* ─── columns ─────────────────────────────────────────────── */
@@ -32,7 +34,16 @@ const columns: Column<BackboneRecord>[] = [
   { key: "transmission", header: "Trans", className: "text-xs" },
   { key: "new_price", header: "New Price", render: (r) => `$${r.new_price.toLocaleString()}` },
   { key: "today_price", header: "Today Price", render: (r) => `$${r.today_price.toLocaleString()}` },
-  { key: "source", header: "Source", className: "text-xs text-zinc-500" },
+  {
+    key: "status",
+    header: "Status",
+    render: (r) => (
+      <Badge variant={r.is_active ? "default" : "secondary"}>
+        {r.is_active ? "Active" : "Inactive"}
+      </Badge>
+    ),
+  },
+  { key: "source", header: "Source", className: "text-xs text-muted-foreground" },
 ];
 
 /* ─── page component ──────────────────────────────────────── */
@@ -118,7 +129,7 @@ export default function BackbonePage() {
   const TopToolbar = (
     <div className="flex gap-2 items-center">
       {selectedRowKeys.length > 0 && (
-        <span className="text-xs text-muted-foreground mr-2 font-medium bg-zinc-100 px-2 py-1 rounded-md">
+        <span className="mr-2 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
           {selectedRowKeys.length} selected
         </span>
       )}
