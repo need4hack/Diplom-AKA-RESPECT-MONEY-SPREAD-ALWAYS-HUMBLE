@@ -15,10 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Search, Calculator, CarFront } from "lucide-react";
+import { Loader2, Search, Calculator } from "lucide-react";
 import { useCascade, CASCADE_CHAIN } from "@/hooks/useCascade";
 import { vin as vinApi, valuation as valuationApi, type ValuationResult } from "@/lib/api";
-import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
+import DamageMapSelector, {
+  type DamageSelection,
+} from "@/components/portal/DamageMapSelector";
 
 /* ─── helpers ─────────────────────────────────────────────── */
 
@@ -41,6 +43,7 @@ export default function PortalPage() {
   const [vinLoading, setVinLoading] = useState(false);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationResult, setValuationResult] = useState<ValuationResult | null>(null);
+  const [damageSelections, setDamageSelections] = useState<DamageSelection[]>([]);
 
   /* Load first cascade field (years) on mount */
   useEffect(() => {
@@ -53,6 +56,10 @@ export default function PortalPage() {
       setMileage(0);
     }
   }, [isNew]);
+
+  useEffect(() => {
+    setDamageSelections([]);
+  }, [cascade.foundVehicle?.id]);
 
   /* ── VIN Decode ──────────────────────────────────────────── */
 
@@ -253,6 +260,33 @@ export default function PortalPage() {
             </CardContent>
           </Card>
 
+          {cascade.foundVehicle && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-sm font-medium">
+                      Damage Inspection Map
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Mark damaged areas after the vehicle has been identified. Leave it
+                      empty if the car is fully clean.
+                    </p>
+                  </div>
+                  <Badge variant="outline">
+                    {damageSelections.length} selected
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <DamageMapSelector
+                  value={damageSelections}
+                  onChange={setDamageSelections}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Vehicle Valuation */}
           <Card>
             <CardHeader className="pb-3">
@@ -347,6 +381,7 @@ export default function PortalPage() {
               )}
             </CardContent>
           </Card>
+
         </div>
       </div>
     </div>
