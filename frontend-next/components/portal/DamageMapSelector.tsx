@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,8 +32,8 @@ type DamagePart =
 type DamageViewKey = "front" | "side";
 
 type DamageMapSelectorProps = {
-  value: DamageSelection[];
-  onChange: (next: DamageSelection[]) => void;
+  initialValue?: DamageSelection[];
+  onChange?: (next: DamageSelection[]) => void;
 };
 
 const DAMAGE_VIEWS: Record<
@@ -90,6 +90,13 @@ const DAMAGE_VIEWS: Record<
   },
 };
 
+const DAMAGE_VIEW_KEYS = Object.keys(DAMAGE_VIEWS) as DamageViewKey[];
+const DAMAGE_PARTS_BY_ID = new Map(
+  DAMAGE_VIEW_KEYS.flatMap((view) =>
+    DAMAGE_VIEWS[view].parts.map((part) => [part.id, part] as const)
+  )
+);
+
 function renderPart(
   part: DamagePart,
   isSelected: boolean,
@@ -137,43 +144,51 @@ function renderPart(
   );
 }
 
-export default function DamageMapSelector({
-  value,
+function DamageMapSelector({
+  initialValue = [],
   onChange,
 }: DamageMapSelectorProps) {
   const [activeView, setActiveView] = useState<DamageViewKey>("side");
   const [hoveredPartKey, setHoveredPartKey] = useState<string | null>(null);
   const [viewBoxes, setViewBoxes] = useState<Partial<Record<DamageViewKey, string>>>({});
+  const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(initialValue);
 
   const activeConfig = DAMAGE_VIEWS[activeView];
-  const selectedKeys = useMemo(() => new Set(value.map((item) => item.key)), [value]);
-  const allPartsById = useMemo(() => {
-    const entries = (Object.keys(DAMAGE_VIEWS) as DamageViewKey[]).flatMap((view) =>
-      DAMAGE_VIEWS[view].parts.map((part) => [part.id, part] as const)
-    );
+  const selectedKeys = useMemo(
+    () => new Set(selectedItems.map((item) => item.key)),
+    [selectedItems]
+  );
+  const hoveredPart = hoveredPartKey ? DAMAGE_PARTS_BY_ID.get(hoveredPartKey) ?? null : null;
 
-    return new Map(entries);
-  }, []);
-  const hoveredPart = hoveredPartKey ? allPartsById.get(hoveredPartKey) ?? null : null;
+  const commitSelection = useCallback(
+    (next: DamageSelection[]) => {
+      setSelectedItems(next);
+      onChange?.(next);
+    },
+    [onChange]
+  );
 
-  function handleToggle(part: DamagePart) {
-    const key = part.id;
-    const existing = value.find((item) => item.key === key);
+  const handleToggle = useCallback(
+    (part: DamagePart) => {
+      const key = part.id;
+      const existing = selectedItems.find((item) => item.key === key);
 
-    if (existing) {
-      onChange(value.filter((item) => item.key !== key));
-      return;
-    }
+      if (existing) {
+        commitSelection(selectedItems.filter((item) => item.key !== key));
+        return;
+      }
 
-    onChange([
-      ...value,
-      {
-        key,
-        id: part.id,
-        label: part.label,
-      },
-    ]);
-  }
+      commitSelection([
+        ...selectedItems,
+        {
+          key,
+          id: part.id,
+          label: part.label,
+        },
+      ]);
+    },
+    [commitSelection, selectedItems]
+  );
 
   function handleImageLoad(
     view: DamageViewKey,
@@ -190,7 +205,7 @@ export default function DamageMapSelector({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          {(Object.keys(DAMAGE_VIEWS) as DamageViewKey[]).map((view) => (
+          {DAMAGE_VIEW_KEYS.map((view) => (
             <Button
               key={view}
               type="button"
@@ -206,8 +221,8 @@ export default function DamageMapSelector({
           type="button"
           variant="ghost"
           size="sm"
-          disabled={value.length === 0}
-          onClick={() => onChange([])}
+          disabled={selectedItems.length === 0}
+          onClick={() => commitSelection([])}
         >
           Clear all
         </Button>
@@ -260,13 +275,13 @@ export default function DamageMapSelector({
             </p>
           </div>
 
-          {value.length === 0 ? (
+          {selectedItems.length === 0 ? (
             <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
               No damage selected.
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {value.map((item) => (
+              {selectedItems.map((item) => (
                 <div
                   key={item.key}
                   className="flex items-start justify-between gap-3 rounded-lg border border-red-500/15 bg-red-500/10 px-3 py-2"
@@ -279,7 +294,9 @@ export default function DamageMapSelector({
                     type="button"
                     className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                     onClick={() =>
-                      onChange(value.filter((selected) => selected.key !== item.key))
+                      commitSelection(
+                        selectedItems.filter((selected) => selected.key !== item.key)
+                      )
                     }
                     aria-label={`Remove ${item.label}`}
                   >
@@ -294,3 +311,5 @@ export default function DamageMapSelector({
     </div>
   );
 }
+
+export default memo(DamageMapSelector);

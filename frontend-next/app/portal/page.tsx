@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export default function PortalPage() {
   const [vinLoading, setVinLoading] = useState(false);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationResult, setValuationResult] = useState<ValuationResult | null>(null);
-  const [damageSelections, setDamageSelections] = useState<DamageSelection[]>([]);
+  const damageSelectionsRef = useRef<DamageSelection[]>([]);
 
   /* Load first cascade field (years) on mount */
   useEffect(() => {
@@ -56,10 +56,6 @@ export default function PortalPage() {
       setMileage(0);
     }
   }, [isNew]);
-
-  useEffect(() => {
-    setDamageSelections([]);
-  }, [cascade.foundVehicle?.id]);
 
   /* ── VIN Decode ──────────────────────────────────────────── */
 
@@ -263,25 +259,22 @@ export default function PortalPage() {
           {cascade.foundVehicle && (
             <Card>
               <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-sm font-medium">
-                      Damage Inspection Map
-                    </CardTitle>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Mark damaged areas after the vehicle has been identified. Leave it
-                      empty if the car is fully clean.
-                    </p>
-                  </div>
-                  <Badge variant="outline">
-                    {damageSelections.length} selected
-                  </Badge>
+                <div>
+                  <CardTitle className="text-sm font-medium">
+                    Damage Inspection Map
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mark damaged areas after the vehicle has been identified. Leave it
+                    empty if the car is fully clean.
+                  </p>
                 </div>
               </CardHeader>
               <CardContent>
                 <DamageMapSelector
-                  value={damageSelections}
-                  onChange={setDamageSelections}
+                  key={cascade.foundVehicle.id}
+                  onChange={(next) => {
+                    damageSelectionsRef.current = next;
+                  }}
                 />
               </CardContent>
             </Card>
