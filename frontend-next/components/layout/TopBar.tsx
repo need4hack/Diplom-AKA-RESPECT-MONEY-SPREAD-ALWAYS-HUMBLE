@@ -1,15 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  Currency,
-  Languages,
-  LogOut,
-  Menu,
-  User,
-} from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Currency, Languages, LogOut, Menu, User } from "lucide-react";
+import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import {
   Sheet,
@@ -25,40 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getNavLabel, NAV_ITEMS } from "./Sidebar";
-import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   CURRENCY_META,
   type CurrencyCode,
   type LanguageCode,
   usePreferences,
 } from "@/contexts/PreferencesContext";
-
-const PAGE_TITLES: Record<LanguageCode, Record<string, string>> = {
-  ru: {
-    "/": "Панель",
-    "/portal": "Портал",
-    "/bulk-search": "Массовый поиск",
-    "/vehicle-region": "Сравнение регионов",
-    "/backbone": "База Данных",
-    "/users": "Пользователи",
-    "/masters": "Справочники",
-    "/vds": "VDS",
-    "/login": "Вход",
-  },
-  en: {
-    "/": "Dashboard",
-    "/portal": "Portal",
-    "/bulk-search": "Bulk Search",
-    "/vehicle-region": "Vehicle Region",
-    "/backbone": "Backbone",
-    "/users": "Users",
-    "/masters": "Masters",
-    "/vds": "VDS",
-    "/login": "Login",
-  },
-};
+import {
+  getNavItemsForRole,
+  getNavLabel,
+  getPageTitle,
+  isNavItemActive,
+} from "@/components/layout/nav-config";
 
 const TOPBAR_TEXT = {
   ru: {
@@ -91,8 +65,9 @@ export default function TopBar() {
   const { language, currency, setLanguage, setCurrency } = usePreferences();
   const [open, setOpen] = useState(false);
 
-  const title = PAGE_TITLES[language][pathname] ?? "CarSpecs";
   const text = TOPBAR_TEXT[language];
+  const title = getPageTitle(pathname, language, user?.role);
+  const navItems = getNavItemsForRole(user?.role);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background px-4 sm:px-6">
@@ -104,7 +79,10 @@ export default function TopBar() {
               <span className="sr-only">{text.toggleMenu}</span>
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] border-zinc-800 bg-zinc-950 p-0 text-zinc-300">
+          <SheetContent
+            side="left"
+            className="w-[280px] border-zinc-800 bg-zinc-950 p-0 text-zinc-300"
+          >
             <SheetTitle className="sr-only">{text.navigationTitle}</SheetTitle>
             <SheetDescription className="sr-only">
               {text.navigationDescription}
@@ -115,9 +93,10 @@ export default function TopBar() {
               </span>
             </div>
             <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-              {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+              {navItems.map(({ href, label, icon: Icon }) => {
+                const isActive = isNavItemActive(pathname, href);
                 const localizedLabel = getNavLabel({ href, label, icon: Icon }, language);
+
                 return (
                   <Link
                     key={href}

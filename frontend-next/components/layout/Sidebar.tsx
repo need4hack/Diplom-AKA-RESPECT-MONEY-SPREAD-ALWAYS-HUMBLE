@@ -3,77 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePreferences } from "@/contexts/PreferencesContext";
 import {
-  LayoutDashboard,
-  Info,
-  Search,
-  Globe,
-  FileText,
-  Users,
-  Settings,
-  Barcode,
-  PanelLeftClose,
-  PanelLeft,
-} from "lucide-react";
-import { type LanguageCode, usePreferences } from "@/contexts/PreferencesContext";
-
-/* ─── nav definition ──────────────────────────────────────── */
-
-export const NAV_ITEMS = [
-  {
-    href: "/",
-    label: { ru: "Панель", en: "Dashboard" },
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/portal",
-    label: { ru: "Портал", en: "Portal" },
-    icon: Info,
-  },
-  {
-    href: "/bulk-search",
-    label: { ru: "Массовый поиск", en: "Bulk Search" },
-    icon: Search,
-  },
-  {
-    href: "/vehicle-region",
-    label: { ru: "Регионы", en: "Vehicle Region" },
-    icon: Globe,
-  },
-  {
-    href: "/backbone",
-    label: { ru: "База Данных", en: "Backbone" },
-    icon: FileText,
-  },
-  {
-    href: "/users",
-    label: { ru: "Пользователи", en: "Users" },
-    icon: Users,
-  },
-  {
-    href: "/masters",
-    label: { ru: "Справочники", en: "Masters" },
-    icon: Settings,
-  },
-  {
-    href: "/vds",
-    label: { ru: "VDS", en: "VDS" },
-    icon: Barcode,
-  },
-];
-
-type NavItem = (typeof NAV_ITEMS)[number];
-
-export function getNavLabel(item: NavItem, language: LanguageCode) {
-  return item.label[language];
-}
-
-/* ─── animation config ────────────────────────────────────── */
+  getNavItemsForRole,
+  getNavLabel,
+  isNavItemActive,
+} from "@/components/layout/nav-config";
 
 const EXPANDED_WIDTH = 240;
-const COLLAPSED_WIDTH = 64; // w-16
+const COLLAPSED_WIDTH = 64;
 
 const sidebarVariants = {
   expanded: {
@@ -101,12 +43,12 @@ const textVariants = {
   },
 };
 
-/* ─── component ───────────────────────────────────────────── */
-
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { user } = useAuth();
   const { language } = usePreferences();
+  const navItems = getNavItemsForRole(user?.role);
 
   return (
     <motion.aside
@@ -114,12 +56,10 @@ export default function Sidebar() {
       animate={collapsed ? "collapsed" : "expanded"}
       variants={sidebarVariants}
       className={cn(
-        "hidden md:flex flex-col bg-zinc-950 text-zinc-300",
-        "border-r border-zinc-800 h-screen sticky top-0 z-40 overflow-hidden"
+        "hidden h-screen sticky top-0 z-40 overflow-hidden border-r border-zinc-800 bg-zinc-950 text-zinc-300 md:flex md:flex-col"
       )}
     >
-      {/* Logo + toggle */}
-      <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-800 shrink-0">
+      <div className="flex h-14 items-center justify-between border-b border-zinc-800 px-4 shrink-0">
         <AnimatePresence mode="popLayout">
           {!collapsed && (
             <motion.span
@@ -128,7 +68,7 @@ export default function Sidebar() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="text-lg font-bold tracking-wider text-white uppercase whitespace-nowrap"
+              className="whitespace-nowrap text-lg font-bold uppercase tracking-wider text-white"
             >
               carspecs
             </motion.span>
@@ -137,8 +77,8 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-white shrink-0",
-            collapsed && "mx-auto" // Centers the hamburger horizontally
+            "shrink-0 rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white",
+            collapsed && "mx-auto"
           )}
           aria-label="Toggle sidebar"
         >
@@ -146,31 +86,31 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
-          const localizedLabel = label[language];
+      <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-2 py-3">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = isNavItemActive(pathname, href);
+          const localizedLabel = getNavLabel({ href, label, icon: Icon }, language);
+
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex items-center p-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap overflow-hidden",
+                "flex items-center overflow-hidden whitespace-nowrap rounded-lg p-2 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-zinc-800 text-white"
                   : "text-zinc-400 hover:bg-zinc-800/60 hover:text-white"
               )}
               title={collapsed ? localizedLabel : undefined}
             >
-              <div className="w-8 h-8 flex shrink-0 items-center justify-center">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                 <Icon size={20} />
               </div>
               <motion.span
                 initial={false}
                 animate={collapsed ? "hide" : "show"}
                 variants={textVariants}
-                className="truncate ml-3"
+                className="ml-3 truncate"
               >
                 {localizedLabel}
               </motion.span>
@@ -179,13 +119,12 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom — version badge */}
-      <div className="px-4 py-3 border-t border-zinc-800 shrink-0 flex items-center justify-center min-h-[45px]">
+      <div className="flex min-h-[45px] items-center justify-center border-t border-zinc-800 px-4 py-3 shrink-0">
         <motion.p
           initial={false}
           animate={collapsed ? "hide" : "show"}
           variants={textVariants}
-          className="text-[11px] text-zinc-600 text-center whitespace-nowrap"
+          className="whitespace-nowrap text-center text-[11px] text-zinc-600"
         >
           CarSpecs v2.0
         </motion.p>

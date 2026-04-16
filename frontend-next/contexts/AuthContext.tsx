@@ -1,7 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { auth as authApi, type UserProfile, type LoginPayload, type RegisterPayload } from "@/lib/api";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import {
+  PROFILE_SYNC_EVENT,
+  auth as authApi,
+  type UserProfile,
+  type LoginPayload,
+  type RegisterPayload,
+} from "@/lib/api";
 import {
   getAccessToken,
   getRefreshToken,
@@ -18,6 +24,7 @@ interface AuthState {
   loading: boolean;
   login: (data: LoginPayload) => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   logout: () => void;
 }
 
@@ -29,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* fetch profile from /me/ endpoint */
   const fetchProfile = useCallback(async (accessToken: string) => {
@@ -79,6 +87,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchProfile(tokens.access);
   }, [fetchProfile]);
 
+  const refreshProfile = useCallback(async () => {
+    const accessToken = getAccessToken();
+
+    if (!accessToken || isTokenExpired(accessToken)) {
+      return;
+    }
+
+    await fetchProfile(accessToken);
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    function scheduleProfileSync() {
+      if (!getAccessToken()) {
+        return;
+      }
+
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+
+      syncTimeoutRef.current = setTimeout(() => {
+        void refreshProfile();
+      }, 300);
+    }
+
+    window.addEventListener(PROFILE_SYNC_EVENT, scheduleProfileSync);
+
+    return () => {
+      window.removeEventListener(PROFILE_SYNC_EVENT, scheduleProfileSync);
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [refreshProfile]);
+
   /* logout */
   const logout = useCallback(() => {
     clearTokens();
@@ -87,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, refreshProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

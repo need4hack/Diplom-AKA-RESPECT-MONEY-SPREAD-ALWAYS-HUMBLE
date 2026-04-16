@@ -15,6 +15,7 @@ from .backends import CustomRefreshToken, CustomJWTAuthentication
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
+    ReportSerializer,
     UserProfileSerializer,
     TokenResponseSerializer,
 )
@@ -142,3 +143,62 @@ def me(request):
     user = request.user
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def track_request(request):
+    """
+    POST /api/auth/track-request/
+    Headers: Authorization: Bearer <access_token>
+
+    Atomically increments request_count for the authenticated user.
+    Intended for internal proxy usage after successful business requests.
+    """
+    try:
+        user = AuthService.increment_request_count(request.user.id)
+    except AuthError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = UserProfileSerializer(user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def reports(request):
+    """
+    GET /api/auth/reports/        -> list current user's reports
+    POST /api/auth/reports/       -> create a new report
+    DELETE /api/auth/reports/     -> clear current user's reports
+    """
+    if request.method == 'GET':
+        user_reports = AuthService.list_reports(request.user.id)
+        serializer = ReportSerializer(user_reports, many=True)
+        return Response(serializer.data)
+
+    if request.method == 'POST':
+        serializer = ReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        report = AuthService.create_report(request.user.id, serializer.validated_data)
+        return Response(ReportSerializer(report).data, status=status.HTTP_201_CREATED)
+
+    deleted = AuthService.clear_reports(request.user.id)
+    return Response({'deleted': deleted}, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def report_detail(request, report_id: int):
+    """
+    DELETE /api/auth/reports/<id>/
+    """
+    deleted = AuthService.delete_report(request.user.id, report_id)
+
+    if not deleted:
+        return Response({'error': 'Report not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response(status=status.HTTP_204_NO_CONTENT)

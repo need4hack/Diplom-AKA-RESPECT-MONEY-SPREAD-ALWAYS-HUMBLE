@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Loader2, Search, Calculator } from "lucide-react";
 import { useCascade, CASCADE_CHAIN } from "@/hooks/useCascade";
 import { vin as vinApi, valuation as valuationApi, type ValuationResult } from "@/lib/api";
+import { usePortalHistory } from "@/contexts/PortalHistoryContext";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import DamageMapSelector, {
   type DamageSelection,
@@ -150,6 +151,7 @@ const PORTAL_FIELD_TEXT = {
 
 export default function PortalPage() {
   const cascade = useCascade();
+  const { addEntry } = usePortalHistory();
   const { language, formatAedPrice } = usePreferences();
   const text = PORTAL_TEXT[language];
   const fieldText = PORTAL_FIELD_TEXT[language];
@@ -242,6 +244,29 @@ export default function PortalPage() {
         isNew
       );
       setValuationResult(result);
+      void addEntry({
+        vin: vinValue.trim().toUpperCase(),
+        vehicleId: result.vehicle_id,
+        year: cascade.foundVehicle.year,
+        make: cascade.foundVehicle.make,
+        model: cascade.foundVehicle.model,
+        trim: cascade.foundVehicle.trim,
+        mileage,
+        isNew,
+        damageCount: damageSelectionsRef.current.length,
+        todayPrice: result.today_price,
+        newPrice: result.new_price,
+        high: result.high,
+        medium: result.medium,
+        low: result.low,
+        vehicleSnapshot: {
+          foundVehicle: cascade.foundVehicle,
+          valuation: result,
+          mileage,
+          isNew,
+        },
+        damageSelections: damageSelectionsRef.current,
+      });
       toast.success(text.valuationCalculated);
     } catch (err: unknown) {
       const error = err as { detail?: string };

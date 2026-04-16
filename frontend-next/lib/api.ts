@@ -8,6 +8,39 @@
 
 import { getAccessToken } from "@/lib/auth";
 
+export const PROFILE_SYNC_EVENT = "app:profile-sync-needed";
+
+function shouldSyncProfile(url: string) {
+  return url === "/api/vin/decode" || url === "/api/valuation/calculate";
+}
+
+function getErrorDetail(body: Record<string, unknown>, fallback: string) {
+  if (typeof body.detail === "string" && body.detail.trim()) {
+    return body.detail;
+  }
+
+  if (typeof body.error === "string" && body.error.trim()) {
+    return body.error;
+  }
+
+  const firstEntry = Object.entries(body).find(([, value]) => value != null);
+  if (!firstEntry) {
+    return fallback;
+  }
+
+  const [field, value] = firstEntry;
+
+  if (Array.isArray(value) && value.length > 0) {
+    return `${field}: ${String(value[0])}`;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return `${field}: ${value}`;
+  }
+
+  return fallback;
+}
+
 function buildRequestHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers ?? {});
 
@@ -28,17 +61,42 @@ function buildRequestHeaders(init?: RequestInit): Headers {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const shouldRequestProfileSync =
+    typeof window !== "undefined" &&
+    shouldSyncProfile(url) &&
+    buildRequestHeaders(init).has("Authorization");
+
   const res = await fetch(url, {
     ...init,
     headers: buildRequestHeaders(init),
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw { status: res.status, detail: body?.detail ?? res.statusText, body };
+    const body = await res.json().catch(() => ({} as Record<string, unknown>));
+
+    if (shouldRequestProfileSync) {
+      window.dispatchEvent(new CustomEvent(PROFILE_SYNC_EVENT));
+    }
+
+    throw {
+      status: res.status,
+      detail: getErrorDetail(body, res.statusText),
+      body,
+    };
   }
 
-  return res.json();
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const responseText = await res.text();
+  const data = responseText ? (JSON.parse(responseText) as T) : (undefined as T);
+
+  if (shouldRequestProfileSync) {
+    window.dispatchEvent(new CustomEvent(PROFILE_SYNC_EVENT));
+  }
+
+  return data;
 }
 
 function authHeaders(token?: string | null): HeadersInit {
@@ -93,6 +151,49 @@ export const auth = {
   me: (token: string) =>
     request<UserProfile>("/api/auth/me", {
       headers: authHeaders(token),
+    }),
+};
+
+export interface ReportRecord {
+  id: number;
+  createdAt: string;
+  vin: string;
+  vehicleId: number;
+  year: number;
+  make: string;
+  model: string;
+  trim: string;
+  mileage: number;
+  isNew: boolean;
+  damageCount: number;
+  todayPrice: number;
+  newPrice: number;
+  high: number;
+  medium: number;
+  low: number;
+  vehicleSnapshot: Record<string, unknown>;
+  damageSelections: unknown[];
+}
+
+export type CreateReportPayload = Omit<ReportRecord, "id" | "createdAt">;
+
+export const reports = {
+  list: () => request<ReportRecord[]>("/api/auth/reports"),
+
+  create: (data: CreateReportPayload) =>
+    request<ReportRecord>("/api/auth/reports", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  clear: () =>
+    request<{ deleted: number }>("/api/auth/reports", {
+      method: "DELETE",
+    }),
+
+  remove: (reportId: number) =>
+    request<void>(`/api/auth/reports/${reportId}`, {
+      method: "DELETE",
     }),
 };
 

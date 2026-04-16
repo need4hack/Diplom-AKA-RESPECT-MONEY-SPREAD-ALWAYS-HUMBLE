@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import DashboardOverview from "@/components/dashboard/DashboardOverview";
+import HomePageContent from "@/components/dashboard/HomePageContent";
 import { getDashboardActivity, getDashboardStats } from "@/lib/request-stats";
 
 export const metadata: Metadata = {
@@ -15,5 +15,5 @@ export default async function DashboardPage() {
     getDashboardActivity(),
   ]);
 
-  return <DashboardOverview stats={stats} activity={activity} />;
+  return <HomePageContent stats={stats} activity={activity} />;
 }

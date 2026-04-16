@@ -61,3 +61,47 @@ class User(models.Model):
     @property
     def is_anonymous(self):
         return False
+
+
+class Report(models.Model):
+    """
+    User valuation reports stored in PostgreSQL.
+
+    Each report belongs to a user from the existing `users` table and keeps
+    the key vehicle/valuation fields needed by the client cards plus JSON
+    snapshots for the full payload.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        db_column='user_id',
+        related_name='reports',
+    )
+    vin = models.CharField(max_length=17, blank=True, default='')
+    vehicle_id = models.IntegerField()
+    year = models.IntegerField()
+    make = models.CharField(max_length=100)
+    model = models.CharField(max_length=100)
+    trim = models.CharField(max_length=150, blank=True, default='')
+    mileage = models.IntegerField(default=0)
+    is_new = models.BooleanField(default=False)
+    damage_count = models.IntegerField(default=0)
+    today_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    new_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    high = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    medium = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    low = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    vehicle_snapshot = models.JSONField(default=dict, blank=True)
+    damage_selections = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'reports'
+        verbose_name = 'Report'
+        verbose_name_plural = 'Reports'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Report #{self.id} - {self.vin}"

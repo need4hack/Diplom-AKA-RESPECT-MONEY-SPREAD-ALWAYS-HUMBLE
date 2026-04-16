@@ -12,6 +12,9 @@ import {
 export type LanguageCode = "ru" | "en";
 export type CurrencyCode = "AED" | "USD" | "RUB";
 
+const DEFAULT_LANGUAGE: LanguageCode = "ru";
+const DEFAULT_CURRENCY: CurrencyCode = "AED";
+
 const STORAGE_KEYS = {
   language: "app-language",
   currency: "app-currency",
@@ -70,35 +73,53 @@ function isCurrencyCode(value: string | null): value is CurrencyCode {
 }
 
 function getInitialLanguage(): LanguageCode {
-  if (typeof window === "undefined") {
-    return "ru";
-  }
-
-  const savedLanguage = window.localStorage.getItem(STORAGE_KEYS.language);
-  return isLanguageCode(savedLanguage) ? savedLanguage : "ru";
+  return DEFAULT_LANGUAGE;
 }
 
 function getInitialCurrency(): CurrencyCode {
-  if (typeof window === "undefined") {
-    return "AED";
-  }
-
-  const savedCurrency = window.localStorage.getItem(STORAGE_KEYS.currency);
-  return isCurrencyCode(savedCurrency) ? savedCurrency : "AED";
+  return DEFAULT_CURRENCY;
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<LanguageCode>(getInitialLanguage);
   const [currency, setCurrency] = useState<CurrencyCode>(getInitialCurrency);
+  const [storageReady, setStorageReady] = useState(false);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEYS.language, language);
+    const frameId = window.requestAnimationFrame(() => {
+      const savedLanguage = window.localStorage.getItem(STORAGE_KEYS.language);
+      const savedCurrency = window.localStorage.getItem(STORAGE_KEYS.currency);
+
+      if (isLanguageCode(savedLanguage)) {
+        setLanguage(savedLanguage);
+      }
+
+      if (isCurrencyCode(savedCurrency)) {
+        setCurrency(savedCurrency);
+      }
+
+      setStorageReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, []);
+
+  useEffect(() => {
     document.documentElement.lang = language;
-  }, [language]);
+    if (!storageReady) {
+      return;
+    }
+
+    window.localStorage.setItem(STORAGE_KEYS.language, language);
+  }, [language, storageReady]);
 
   useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+
     window.localStorage.setItem(STORAGE_KEYS.currency, currency);
-  }, [currency]);
+  }, [currency, storageReady]);
 
   const value = useMemo<PreferencesContextValue>(() => {
     const convertFromAed = (amount: number) => amount * EXCHANGE_RATES[currency];

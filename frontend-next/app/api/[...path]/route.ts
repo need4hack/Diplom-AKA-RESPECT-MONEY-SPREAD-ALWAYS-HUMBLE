@@ -32,6 +32,13 @@ type JwtActor = {
   role: string | null;
 };
 
+function shouldTrackRequestCount(requestPath: string, method: string) {
+  return (
+    (requestPath === "/api/vin/decode/" && method === "POST") ||
+    (requestPath === "/api/valuation/calculate/" && method === "POST")
+  );
+}
+
 function decodeBase64Url(value: string): string | null {
   try {
     const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -86,6 +93,27 @@ function getBackendUrl(path: string[]): string | null {
   const cleanPath = path.filter(Boolean).join("/");
   // Always add one trailing slash — Django requires it (APPEND_SLASH)
   return `${baseUrl}/api/${cleanPath}/`;
+}
+
+async function trackAuthenticatedRequest(req: NextRequest) {
+  const authServiceUrl = SERVICE_MAP.auth;
+  const authHeader = req.headers.get("authorization");
+
+  if (!authServiceUrl || !authHeader?.startsWith("Bearer ")) {
+    return;
+  }
+
+  try {
+    await fetch(`${authServiceUrl}/api/auth/track-request/`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[API Proxy] Failed to track request count:", error);
+  }
 }
 
 async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -143,6 +171,10 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
         username: actor.username,
         role: actor.role,
       });
+    }
+
+    if (response.ok && actor.userId && shouldTrackRequestCount(requestPath, req.method)) {
+      await trackAuthenticatedRequest(req);
     }
 
     return new NextResponse(responseBody, {

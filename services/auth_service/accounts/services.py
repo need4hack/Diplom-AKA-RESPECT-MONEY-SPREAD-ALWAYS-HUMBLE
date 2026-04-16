@@ -10,7 +10,9 @@ import hashlib
 import secrets
 import logging
 
-from .models import User
+from django.db.models import F
+
+from .models import Report, User
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +127,43 @@ class AuthService:
             return User.objects.get(pk=user_id, is_active=True)
         except User.DoesNotExist:
             raise AuthError('User not found.')
+
+    @staticmethod
+    def increment_request_count(user_id) -> User:
+        """
+        Atomically increment the request counter for a user.
+
+        Raises:
+            AuthError: If the user does not exist or is inactive.
+        """
+        updated = User.objects.filter(pk=user_id, is_active=True).update(
+            request_count=F('request_count') + 1
+        )
+
+        if not updated:
+            raise AuthError('User not found.')
+
+        return AuthService.get_user_by_id(user_id)
+
+    @staticmethod
+    def list_reports(user_id):
+        return Report.objects.filter(user_id=user_id).order_by('-created_at')
+
+    @staticmethod
+    def create_report(user_id, report_data: dict) -> Report:
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        return Report.objects.create(user=user, **report_data)
+
+    @staticmethod
+    def delete_report(user_id, report_id: int) -> bool:
+        deleted, _ = Report.objects.filter(pk=report_id, user_id=user_id).delete()
+        return deleted > 0
+
+    @staticmethod
+    def clear_reports(user_id) -> int:
+        deleted, _ = Report.objects.filter(user_id=user_id).delete()
+        return deleted
