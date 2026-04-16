@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Search, Plus, FileQuestion } from "lucide-re
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { Checkbox } from "@/components/ui/checkbox";
+import { usePreferences } from "@/contexts/PreferencesContext";
 
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -22,6 +23,16 @@ export interface Column<T> {
   header: string;
   render?: (row: T) => React.ReactNode;
   className?: string;
+}
+
+interface DataTableTexts {
+  totalLabel: string;
+  pageLabel: string;
+  ofLabel: string;
+  noRecordsTitle: string;
+  noRecordsDescription: string;
+  searchButtonLabel: string;
+  createButtonLabel: string;
 }
 
 interface DataTableProps<T> {
@@ -47,6 +58,7 @@ interface DataTableProps<T> {
   selectedRowKeys?: string[];
   onSelectedRowKeysChange?: (keys: string[]) => void;
   toolbarActions?: React.ReactNode;
+  texts?: Partial<DataTableTexts>;
 }
 
 /* ─── component ───────────────────────────────────────────── */
@@ -72,8 +84,23 @@ export default function DataTable<T extends object>({
   selectedRowKeys = [],
   onSelectedRowKeysChange,
   toolbarActions,
+  texts,
 }: DataTableProps<T>) {
   const [searchValue, setSearchValue] = useState("");
+  const { language } = usePreferences();
+  const uiText: DataTableTexts = {
+    totalLabel: language === "ru" ? "Всего" : "Total",
+    pageLabel: language === "ru" ? "Страница" : "Page",
+    ofLabel: language === "ru" ? "из" : "of",
+    noRecordsTitle: language === "ru" ? "Записи не найдены" : "No records found",
+    noRecordsDescription:
+      language === "ru"
+        ? "По текущим фильтрам или поисковому запросу данных нет."
+        : "No data is available for the current filters or search query.",
+    searchButtonLabel: language === "ru" ? "Поиск" : "Search",
+    createButtonLabel: language === "ru" ? "Создать" : "Create New",
+    ...texts,
+  };
 
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
@@ -118,7 +145,7 @@ export default function DataTable<T extends object>({
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <span className="text-sm text-muted-foreground">
-        Page {page} of {totalPages}
+        {uiText.pageLabel} {page} {uiText.ofLabel} {totalPages}
       </span>
       <Button
         variant="outline"
@@ -145,7 +172,13 @@ export default function DataTable<T extends object>({
                 placeholder={searchPlaceholder}
                 className={`w-64 ${searchInputClassName ?? ""}`}
               />
-              <Button variant="secondary" size="sm" onClick={handleSearch}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSearch}
+                aria-label={uiText.searchButtonLabel}
+                title={uiText.searchButtonLabel}
+              >
                 <Search className="h-4 w-4" />
               </Button>
             </>
@@ -153,7 +186,7 @@ export default function DataTable<T extends object>({
           {showTopPagination && paginationControls}
           {title && (
             <span className="ml-2 text-sm text-muted-foreground">
-              Total: {totalRecords.toLocaleString()}
+              {uiText.totalLabel}: {totalRecords.toLocaleString()}
             </span>
           )}
         </div>
@@ -161,7 +194,7 @@ export default function DataTable<T extends object>({
           {toolbarActions}
           {onCreate && (
             <Button size="sm" onClick={onCreate}>
-              <Plus className="h-4 w-4 mr-1" /> Create New
+              <Plus className="h-4 w-4 mr-1" /> {uiText.createButtonLabel}
             </Button>
           )}
         </div>
@@ -211,8 +244,8 @@ export default function DataTable<T extends object>({
                         <FileQuestion className="h-6 w-6 text-muted-foreground" />
                       </div>
                     }
-                    title="No records found"
-                    description="No data is available for the current filters or search query."
+                    title={uiText.noRecordsTitle}
+                    description={uiText.noRecordsDescription}
                     className="border-none min-h-[250px]"
                   />
                 </TableCell>

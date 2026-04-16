@@ -17,19 +17,58 @@ import {
   PanelLeftClose,
   PanelLeft,
 } from "lucide-react";
+import { type LanguageCode, usePreferences } from "@/contexts/PreferencesContext";
 
 /* ─── nav definition ──────────────────────────────────────── */
 
 export const NAV_ITEMS = [
-  { href: "/",               label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/portal",         label: "Portal",         icon: Info },
-  { href: "/bulk-search",    label: "Bulk Search",    icon: Search },
-  { href: "/vehicle-region", label: "Vehicle Region", icon: Globe },
-  { href: "/backbone",       label: "Backbone",       icon: FileText },
-  { href: "/users",          label: "Users",          icon: Users },
-  { href: "/masters",        label: "Masters",        icon: Settings },
-  { href: "/vds",            label: "VDS",            icon: Barcode },
+  {
+    href: "/",
+    label: { ru: "Панель", en: "Dashboard" },
+    icon: LayoutDashboard,
+  },
+  {
+    href: "/portal",
+    label: { ru: "Портал", en: "Portal" },
+    icon: Info,
+  },
+  {
+    href: "/bulk-search",
+    label: { ru: "Массовый поиск", en: "Bulk Search" },
+    icon: Search,
+  },
+  {
+    href: "/vehicle-region",
+    label: { ru: "Регионы", en: "Vehicle Region" },
+    icon: Globe,
+  },
+  {
+    href: "/backbone",
+    label: { ru: "База Данных", en: "Backbone" },
+    icon: FileText,
+  },
+  {
+    href: "/users",
+    label: { ru: "Пользователи", en: "Users" },
+    icon: Users,
+  },
+  {
+    href: "/masters",
+    label: { ru: "Справочники", en: "Masters" },
+    icon: Settings,
+  },
+  {
+    href: "/vds",
+    label: { ru: "VDS", en: "VDS" },
+    icon: Barcode,
+  },
 ];
+
+type NavItem = (typeof NAV_ITEMS)[number];
+
+export function getNavLabel(item: NavItem, language: LanguageCode) {
+  return item.label[language];
+}
 
 /* ─── animation config ────────────────────────────────────── */
 
@@ -67,6 +106,7 @@ const textVariants = {
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { language } = usePreferences();
 
   return (
     <motion.aside
@@ -110,6 +150,7 @@ export default function Sidebar() {
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+          const localizedLabel = label[language];
           return (
             <Link
               key={href}
@@ -120,7 +161,7 @@ export default function Sidebar() {
                   ? "bg-zinc-800 text-white"
                   : "text-zinc-400 hover:bg-zinc-800/60 hover:text-white"
               )}
-              title={collapsed ? label : undefined}
+              title={collapsed ? localizedLabel : undefined}
             >
               <div className="w-8 h-8 flex shrink-0 items-center justify-center">
                 <Icon size={20} />
@@ -131,7 +172,7 @@ export default function Sidebar() {
                 variants={textVariants}
                 className="truncate ml-3"
               >
-                {label}
+                {localizedLabel}
               </motion.span>
             </Link>
           );

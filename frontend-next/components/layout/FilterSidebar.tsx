@@ -10,23 +10,62 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { vehicles } from "@/lib/api";
 
 type OptionRecord = { value: string };
+type LanguageCode = "ru" | "en";
+type CurrencyCode = "AED" | "USD" | "RUB";
+type SidebarFilters = Record<string, string | number>;
 
 type FilterSidebarProps = {
-  onFiltersChange: (filters: Record<string, any>) => void;
+  onFiltersChange: (filters: SidebarFilters) => void;
+  language?: LanguageCode;
+  currency?: CurrencyCode;
+  formatPrice?: (value: number) => string;
 };
 
-export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
+const CURRENT_YEAR = new Date().getFullYear();
+
+const FILTER_TEXT = {
+  en: {
+    title: "Filters",
+    reset: "Reset",
+    activeOnly: "Active only",
+    yearRange: "Year Range",
+    price: "Price",
+    make: "Make",
+    bodyType: "Body Type",
+    loadingMakes: "Loading makes...",
+    loadingBodies: "Loading body types...",
+  },
+  ru: {
+    title: "Фильтры",
+    reset: "Сбросить",
+    activeOnly: "Только активные",
+    yearRange: "Диапазон лет",
+    price: "Цена",
+    make: "Марка",
+    bodyType: "Тип кузова",
+    loadingMakes: "Загрузка марок...",
+    loadingBodies: "Загрузка типов кузова...",
+  },
+} as const;
+
+export default function FilterSidebar({
+  onFiltersChange,
+  language = "en",
+  currency = "AED",
+  formatPrice,
+}: FilterSidebarProps) {
   const [makes, setMakes] = useState<string[]>([]);
   const [bodies, setBodies] = useState<string[]>([]);
 
   const [selectedMakes, setSelectedMakes] = useState<Set<string>>(new Set());
   const [selectedBodies, setSelectedBodies] = useState<Set<string>>(new Set());
-  const [yearRange, setYearRange] = useState<[number, number]>([2000, 2025]);
+  const [yearRange, setYearRange] = useState<[number, number]>([2000, CURRENT_YEAR]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
   const [isActive, setIsActive] = useState<boolean>(false);
+  const text = FILTER_TEXT[language];
+  const renderPrice = formatPrice ?? ((value: number) => value.toLocaleString());
 
   // Fetch filter options once
   useEffect(() => {
@@ -45,13 +84,13 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
 
   // Sync to parent
   useEffect(() => {
-    const filters: Record<string, any> = {};
+    const filters: SidebarFilters = {};
     if (selectedMakes.size > 0) filters.make__in = Array.from(selectedMakes).join(",");
     if (selectedBodies.size > 0) filters.body__in = Array.from(selectedBodies).join(",");
     
     // Only apply range if not touching edges
     if (yearRange[0] > 2000) filters.year_min = yearRange[0];
-    if (yearRange[1] < 2025) filters.year_max = yearRange[1];
+    if (yearRange[1] < CURRENT_YEAR) filters.year_max = yearRange[1];
 
     if (priceRange[0] > 0) filters.price_min = priceRange[0];
     if (priceRange[1] < 500000) filters.price_max = priceRange[1];
@@ -63,7 +102,7 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
     }, 400);
 
     return () => clearTimeout(timeout);
-  }, [selectedMakes, selectedBodies, yearRange, priceRange, isActive]);
+  }, [isActive, onFiltersChange, priceRange, selectedBodies, selectedMakes, yearRange]);
 
   const toggleSet = (set: Set<string>, val: string, updateFn: (s: Set<string>) => void) => {
     const newSet = new Set(set);
@@ -73,24 +112,24 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
   };
 
   return (
-    <div className="w-64 flex-shrink-0 bg-background/50 border rounded-md p-4 space-y-6">
+    <div className="w-full lg:w-64 flex-shrink-0 bg-background/50 border rounded-md p-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold px-1">Filters</h3>
+        <h3 className="font-semibold px-1">{text.title}</h3>
         <button 
           onClick={() => {
             setSelectedMakes(new Set()); setSelectedBodies(new Set());
-            setYearRange([2000, 2025]); setPriceRange([0, 500000]);
+            setYearRange([2000, CURRENT_YEAR]); setPriceRange([0, 500000]);
             setIsActive(false);
           }}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
-          Reset
+          {text.reset}
         </button>
       </div>
 
       <div className="flex items-center justify-between px-1">
         <label className="text-sm cursor-pointer select-none" htmlFor="active-switch">
-          Active only
+          {text.activeOnly}
         </label>
         <Switch 
           id="active-switch" 
@@ -102,10 +141,10 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
       <Accordion type="multiple" defaultValue={["year", "price", "make", "body"]} className="w-full">
         
         <AccordionItem value="year" className="border-b-0 pb-2">
-          <AccordionTrigger className="py-2 text-sm">Year Range</AccordionTrigger>
+          <AccordionTrigger className="py-2 text-sm">{text.yearRange}</AccordionTrigger>
           <AccordionContent className="pt-4 px-1 pb-4">
             <Slider
-              min={2000} max={2025} step={1}
+              min={2000} max={CURRENT_YEAR} step={1}
               value={yearRange}
               onValueChange={(val) => setYearRange(val as [number, number])}
             />
@@ -117,7 +156,9 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
         </AccordionItem>
 
         <AccordionItem value="price" className="border-b-0 pb-2">
-          <AccordionTrigger className="py-2 text-sm">Price (USD)</AccordionTrigger>
+          <AccordionTrigger className="py-2 text-sm">
+            {text.price} ({currency})
+          </AccordionTrigger>
           <AccordionContent className="pt-4 px-1 pb-4">
             <Slider
               min={0} max={500000} step={1000}
@@ -125,18 +166,18 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
               onValueChange={(val) => setPriceRange(val as [number, number])}
             />
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
-              <span>${priceRange[0].toLocaleString()}</span>
-              <span>${priceRange[1].toLocaleString()}</span>
+              <span>{renderPrice(priceRange[0])}</span>
+              <span>{renderPrice(priceRange[1])}</span>
             </div>
           </AccordionContent>
         </AccordionItem>
 
         <AccordionItem value="make" className="border-b-0 pb-2">
-          <AccordionTrigger className="py-2 text-sm">Make</AccordionTrigger>
+          <AccordionTrigger className="py-2 text-sm">{text.make}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3 pt-2 overflow-y-auto pr-2 custom-scrollbar" style={{ height: '350px' }}>
               {makes.length === 0 ? (
-                <div className="text-sm text-muted-foreground animate-pulse">Loading makes...</div>
+                <div className="text-sm text-muted-foreground animate-pulse">{text.loadingMakes}</div>
               ) : (
                 makes.slice(0, 200).map((make) => (
                   <div key={make} className="flex items-center space-x-2">
@@ -156,11 +197,11 @@ export default function FilterSidebar({ onFiltersChange }: FilterSidebarProps) {
         </AccordionItem>
 
         <AccordionItem value="body" className="border-b-0">
-          <AccordionTrigger className="py-2 text-sm">Body Type</AccordionTrigger>
+          <AccordionTrigger className="py-2 text-sm">{text.bodyType}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3 pt-2 overflow-y-auto pr-2 custom-scrollbar" style={{ height: '350px' }}>
               {bodies.length === 0 ? (
-                <div className="text-sm text-muted-foreground animate-pulse">Loading body types...</div>
+                <div className="text-sm text-muted-foreground animate-pulse">{text.loadingBodies}</div>
               ) : (
                 bodies.map((body) => (
                   <div key={body} className="flex items-center space-x-2">

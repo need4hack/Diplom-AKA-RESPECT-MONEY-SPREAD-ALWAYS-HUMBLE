@@ -1,48 +1,79 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { AlertCircle, RefreshCcw } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { AlertCircle, RefreshCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+type LanguageCode = "ru" | "en";
+
+const TEXT = {
+  ru: {
+    title: "Что-то пошло не так",
+    description:
+      "В приложении произошла непредвиденная ошибка. Мы зафиксировали проблему, но вы можете попробовать обновить страницу.",
+    retry: "Попробовать снова",
+    goHome: "Перейти на панель",
+  },
+  en: {
+    title: "Something went wrong",
+    description:
+      "An unexpected error occurred in the application. We've logged the issue, but you can try refreshing the page.",
+    retry: "Try again",
+    goHome: "Go to Dashboard",
+  },
+} as const;
+
+function getInitialLanguage(): LanguageCode {
+  if (typeof window === "undefined") {
+    return "ru";
+  }
+
+  return window.localStorage.getItem("app-language") === "en" ? "en" : "ru";
+}
 
 export default function GlobalError({
   error,
   reset,
 }: {
-  error: Error & { digest?: string }
-  reset: () => void
+  error: Error & { digest?: string };
+  reset: () => void;
 }) {
+  const [language] = useState<LanguageCode>(getInitialLanguage);
+  const text = TEXT[language];
+
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error("Global Error Boundary caught:", error)
-  }, [error])
+    console.error("Global Error Boundary caught:", error);
+  }, [error]);
 
   return (
     <div className="flex h-screen w-full flex-col items-center justify-center bg-background px-4">
-      <div className="mx-auto flex max-w-[500px] flex-col items-center justify-center text-center space-y-6">
+      <div className="mx-auto flex max-w-[500px] flex-col items-center justify-center space-y-6 text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10">
           <AlertCircle className="h-10 w-10 text-destructive" />
         </div>
-        
+
         <div className="space-y-2">
           <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            Something went wrong!
+            {text.title}
           </h2>
           <p className="max-w-[400px] text-sm text-muted-foreground">
-            An unexpected error occurred in the application. We've logged the issue, but you can try refreshing the page.
+            {text.description}
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 min-w-[200px]">
+        <div className="flex min-w-[200px] flex-col gap-2 sm:flex-row">
           <Button onClick={() => reset()} className="w-full">
             <RefreshCcw className="mr-2 h-4 w-4" />
-            Try again
+            {text.retry}
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.href = '/'}
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.location.href = "/";
+            }}
             className="w-full"
           >
-            Go to Dashboard
+            {text.goHome}
           </Button>
         </div>
 
@@ -53,5 +84,5 @@ export default function GlobalError({
         )}
       </div>
     </div>
-  )
+  );
 }

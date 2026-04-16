@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2, Car } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { usePreferences } from "@/contexts/PreferencesContext";
 
 interface FormErrors {
   username?: string;
@@ -20,18 +21,68 @@ interface FormErrors {
   general?: string;
 }
 
+const LOGIN_TEXT = {
+  ru: {
+    welcome: "Добро пожаловать в B2B платформу оценки",
+    signIn: "Войти",
+    signUp: "Регистрация",
+    username: "Имя пользователя",
+    password: "Пароль",
+    email: "Email",
+    forgot: "Забыли?",
+    fillAll: "Пожалуйста, заполните все поля",
+    loggedIn: "Вход выполнен успешно",
+    loginFailed: "Ошибка входа",
+    invalidCredentials: "Неверные учетные данные",
+    accountCreated: "Аккаунт создан",
+    registrationFailed: "Ошибка регистрации",
+    signInButton: "ВОЙТИ",
+    createAccount: "СОЗДАТЬ АККАУНТ",
+    analyticsTitle: "Продвинутая аналитика авто",
+    analyticsText: "Профессиональная база данных для оценки автомобилей и исследования рынка.",
+    termsPrefix: "Нажимая продолжить, вы соглашаетесь с",
+    terms: "Условиями",
+    privacy: "Политикой конфиденциальности",
+    and: "и",
+  },
+  en: {
+    welcome: "Welcome to the B2B Valuation Platform",
+    signIn: "Sign In",
+    signUp: "Sign Up",
+    username: "Username",
+    password: "Password",
+    email: "Email",
+    forgot: "Forgot?",
+    fillAll: "Please fill all fields",
+    loggedIn: "Logged in successfully",
+    loginFailed: "Login failed",
+    invalidCredentials: "Invalid credentials",
+    accountCreated: "Account created!",
+    registrationFailed: "Registration failed",
+    signInButton: "SIGN IN",
+    createAccount: "CREATE ACCOUNT",
+    analyticsTitle: "Advanced Car Analytics",
+    analyticsText: "The professional backbone database for automotive pricing and market research.",
+    termsPrefix: "By clicking continue, you agree to our",
+    terms: "Terms",
+    privacy: "Privacy Policy",
+    and: "and",
+  },
+} as const;
+
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const { login, register } = useAuth();
+  const { language } = usePreferences();
+  const text = LOGIN_TEXT[language];
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [activeTab, setActiveTab] = useState("login");
 
-  /* ─── State ────────────────────────────────────────────────── */
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
@@ -39,44 +90,47 @@ export function LoginForm({
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
 
-  /* ─── Handlers ─────────────────────────────────────────────── */
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
     setErrors({});
+
     if (!loginUsername.trim() || !loginPassword) {
-      setErrors({ general: "Please fill all fields" });
+      setErrors({ general: text.fillAll });
       return;
     }
 
     setLoading(true);
     try {
       await login({ username: loginUsername, password: loginPassword });
-      toast.success("Logged in successfully");
+      toast.success(text.loggedIn);
       router.push("/");
-    } catch (err: any) {
-      setErrors({ general: err?.detail || "Invalid credentials" });
-      toast.error("Login failed");
+    } catch (error: unknown) {
+      const authError = error as { detail?: string };
+      setErrors({ general: authError?.detail || text.invalidCredentials });
+      toast.error(text.loginFailed);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleRegister(event: React.FormEvent) {
+    event.preventDefault();
     setErrors({});
+
     if (!regUsername.trim() || !regEmail.trim() || !regPassword) {
-      setErrors({ general: "Please fill all fields" });
+      setErrors({ general: text.fillAll });
       return;
     }
 
     setLoading(true);
     try {
       await register({ username: regUsername, email: regEmail, password: regPassword });
-      toast.success("Account created!");
+      toast.success(text.accountCreated);
       router.push("/");
-    } catch (err: any) {
-      setErrors({ general: err?.detail || "Registration failed" });
-      toast.error("Registration failed");
+    } catch (error: unknown) {
+      const authError = error as { detail?: string };
+      setErrors({ general: authError?.detail || text.registrationFailed });
+      toast.error(text.registrationFailed);
     } finally {
       setLoading(false);
     }
@@ -84,21 +138,18 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="overflow-hidden p-0 border-zinc-800 bg-zinc-900 shadow-2xl">
-        <CardContent className="grid p-0 md:grid-cols-2 min-h-[500px]">
-          {/* Form Side */}
-          <div className="p-6 md:p-8 flex flex-col justify-start">
-            <div className="flex flex-col items-center gap-2 text-center mb-6">
-              <h1 className="text-3xl font-black tracking-tighter text-white uppercase flex items-center gap-2">
+      <Card className="overflow-hidden border-zinc-800 bg-zinc-900 p-0 shadow-2xl">
+        <CardContent className="grid min-h-[500px] p-0 md:grid-cols-2">
+          <div className="flex flex-col justify-start p-6 md:p-8">
+            <div className="mb-6 flex flex-col items-center gap-2 text-center">
+              <h1 className="flex items-center gap-2 text-3xl font-black uppercase tracking-tighter text-white">
                 CarSpecs
               </h1>
-              <p className="text-sm text-zinc-400">
-                Welcome to the B2B Valuation Platform
-              </p>
+              <p className="text-sm text-zinc-400">{text.welcome}</p>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-zinc-800 mb-6 p-1 h-12 relative overflow-hidden">
+              <TabsList className="relative mb-6 grid h-12 w-full grid-cols-2 overflow-hidden bg-zinc-800 p-1">
                 <TabsTrigger
                   value="login"
                   className={cn(
@@ -110,11 +161,11 @@ export function LoginForm({
                   {activeTab === "login" && (
                     <motion.div
                       layoutId="active-tab"
-                      className="absolute inset-0 bg-zinc-700 rounded-md"
+                      className="absolute inset-0 rounded-md bg-zinc-700"
                       transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                     />
                   )}
-                  <span className="relative z-20">Sign In</span>
+                  <span className="relative z-20">{text.signIn}</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="register"
@@ -127,113 +178,136 @@ export function LoginForm({
                   {activeTab === "register" && (
                     <motion.div
                       layoutId="active-tab"
-                      className="absolute inset-0 bg-zinc-700 rounded-md"
+                      className="absolute inset-0 rounded-md bg-zinc-700"
                       transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                     />
                   )}
-                  <span className="relative z-20">Sign Up</span>
+                  <span className="relative z-20">{text.signUp}</span>
                 </TabsTrigger>
               </TabsList>
+
               <div className="min-h-[300px]">
-
-              <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-username" className="text-zinc-300">Username</Label>
-                    <Input
-                      id="login-username"
-                      value={loginUsername}
-                      onChange={(e) => setLoginUsername(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 h-10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="login-password" className="text-zinc-300">Password</Label>
-                      <a href="#" className="text-xs text-zinc-500 hover:text-white transition-colors">Forgot?</a>
+                <TabsContent value="login" className="mt-0">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-username" className="text-zinc-300">
+                        {text.username}
+                      </Label>
+                      <Input
+                        id="login-username"
+                        value={loginUsername}
+                        onChange={(event) => setLoginUsername(event.target.value)}
+                        className="h-10 border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500"
+                      />
                     </div>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white h-10"
-                    />
-                  </div>
-                  {errors.general && <p className="text-xs text-red-500 text-center">{errors.general}</p>}
-                  <Button type="submit" variant="ghost" className="w-full bg-white text-black hover:bg-zinc-200 mt-2 h-10 font-bold" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    SIGN IN
-                  </Button>
-                </form>
-              </TabsContent>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="login-password" className="text-zinc-300">
+                          {text.password}
+                        </Label>
+                        <a href="#" className="text-xs text-zinc-500 transition-colors hover:text-white">
+                          {text.forgot}
+                        </a>
+                      </div>
+                      <Input
+                        id="login-password"
+                        type="password"
+                        value={loginPassword}
+                        onChange={(event) => setLoginPassword(event.target.value)}
+                        className="h-10 border-zinc-700 bg-zinc-800 text-white"
+                      />
+                    </div>
+                    {errors.general && (
+                      <p className="text-center text-xs text-red-500">{errors.general}</p>
+                    )}
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      className="mt-2 h-10 w-full bg-white font-bold text-black hover:bg-zinc-200"
+                      disabled={loading}
+                    >
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {text.signInButton}
+                    </Button>
+                  </form>
+                </TabsContent>
 
-
-              <TabsContent value="register" className="mt-0">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-username" className="text-zinc-300">Username</Label>
-                    <Input
-                      id="reg-username"
-                      value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white h-10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-email" className="text-zinc-300">Email</Label>
-                    <Input
-                      id="reg-email"
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white h-10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-password" className="text-zinc-300">Password</Label>
-                    <Input
-                      id="reg-password"
-                      type="password"
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white h-10"
-                    />
-                  </div>
-                  <Button type="submit" variant="ghost" className="w-full bg-white text-black hover:bg-zinc-200 mt-2 h-10 font-bold" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    CREATE ACCOUNT
-                  </Button>
-                </form>
-              </TabsContent>
+                <TabsContent value="register" className="mt-0">
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-username" className="text-zinc-300">
+                        {text.username}
+                      </Label>
+                      <Input
+                        id="reg-username"
+                        value={regUsername}
+                        onChange={(event) => setRegUsername(event.target.value)}
+                        className="h-10 border-zinc-700 bg-zinc-800 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-email" className="text-zinc-300">
+                        {text.email}
+                      </Label>
+                      <Input
+                        id="reg-email"
+                        type="email"
+                        value={regEmail}
+                        onChange={(event) => setRegEmail(event.target.value)}
+                        className="h-10 border-zinc-700 bg-zinc-800 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-password" className="text-zinc-300">
+                        {text.password}
+                      </Label>
+                      <Input
+                        id="reg-password"
+                        type="password"
+                        value={regPassword}
+                        onChange={(event) => setRegPassword(event.target.value)}
+                        className="h-10 border-zinc-700 bg-zinc-800 text-white"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      className="mt-2 h-10 w-full bg-white font-bold text-black hover:bg-zinc-200"
+                      disabled={loading}
+                    >
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {text.createAccount}
+                    </Button>
+                  </form>
+                </TabsContent>
               </div>
             </Tabs>
           </div>
 
-          {/* Marketing/Branding Side (Grey as requested) */}
-          <div className="relative hidden bg-zinc-800 md:flex flex-col items-center justify-center p-12 overflow-hidden border-l border-zinc-700">
+          <div className="relative hidden flex-col items-center justify-center overflow-hidden border-l border-zinc-700 bg-zinc-800 p-12 md:flex">
             <div className="absolute inset-x-0 bottom-0 top-0 bg-gradient-to-t from-zinc-950/50 to-transparent" />
-            <div className="relative z-10 text-center space-y-6">
-              <div className="mx-auto w-24 h-24 rounded-2xl bg-white flex items-center justify-center shadow-2xl rotate-3">
+            <div className="relative z-10 space-y-6 text-center">
+              <div className="mx-auto flex h-24 w-24 rotate-3 items-center justify-center rounded-2xl bg-white shadow-2xl">
                 <span className="text-4xl font-black text-black">C.</span>
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-white tracking-tight">Advanced Car Analytics</h2>
-                <p className="text-zinc-400 text-sm max-w-[280px]">
-                  The professional backbone database for automotive pricing and market research.
+                <h2 className="text-2xl font-bold tracking-tight text-white">
+                  {text.analyticsTitle}
+                </h2>
+                <p className="mx-auto max-w-[280px] text-sm text-zinc-400">
+                  {text.analyticsText}
                 </p>
               </div>
             </div>
 
-            {/* Subtle background decoration */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-white/5 rounded-full blur-3xl" />
+            <div className="absolute left-[-10%] top-[-10%] h-[40%] w-[40%] rounded-full bg-white/5 blur-3xl" />
+            <div className="absolute bottom-[-10%] right-[-10%] h-[60%] w-[60%] rounded-full bg-white/5 blur-3xl" />
           </div>
         </CardContent>
       </Card>
       <p className="px-6 text-center text-xs text-zinc-500">
-        By clicking continue, you agree to our <a href="#" className="underline">Terms</a>{" "}
-        and <a href="#" className="underline">Privacy Policy</a>.
+        {text.termsPrefix} <a href="#" className="underline">{text.terms}</a>{" "}
+        {text.and} <a href="#" className="underline">{text.privacy}</a>.
       </p>
     </div>
   );

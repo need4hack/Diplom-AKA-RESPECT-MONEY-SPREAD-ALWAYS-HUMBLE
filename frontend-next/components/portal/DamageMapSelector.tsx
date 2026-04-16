@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { usePreferences } from "@/contexts/PreferencesContext";
 
 export interface DamageSelection {
   key: string;
@@ -43,6 +44,8 @@ const DAMAGE_VIEWS: Record<
     imageSrc: string;
     defaultViewBox: string;
     parts: DamagePart[];
+    imageClassName?: string;
+    groupTransform?: string;
   }
 > = {
   side: {
@@ -90,10 +93,76 @@ const DAMAGE_VIEWS: Record<
   },
 };
 
-const DAMAGE_VIEW_KEYS = Object.keys(DAMAGE_VIEWS) as DamageViewKey[];
+type MirroredPartMeta = {
+  id: string;
+  label: string;
+};
+
+const SIDE_MIRROR_WIDTH = 640;
+
+const MIRRORED_SIDE_PART_META: Partial<Record<string, MirroredPartMeta>> = {
+  REAR_WING: { id: "LEFT_REAR_WING", label: "Left rear quarter panel" },
+  REAR_DOOR: { id: "LEFT_REAR_DOOR", label: "Left rear door" },
+  FRONT_DOOR: { id: "LEFT_FRONT_DOOR", label: "Left front door" },
+  FRONT_WING: { id: "LEFT_FRONT_WING", label: "Left front fender" },
+  ROCKER_PANEL: { id: "LEFT_ROCKER_PANEL", label: "Left rocker panel" },
+  REAR_WHEEL: { id: "LEFT_REAR_WHEEL", label: "Left rear wheel" },
+  FRONT_WHEEL: { id: "LEFT_FRONT_WHEEL", label: "Left front wheel" },
+  REAR_WHEEL_DISK: { id: "LEFT_REAR_WHEEL_DISK", label: "Left rear rim" },
+  FRONT_WHEEL_DISK: { id: "LEFT_FRONT_WHEEL_DISK", label: "Left front rim" },
+  REAR_LIGHTS: { id: "LEFT_REAR_LIGHTS", label: "Left tail light" },
+  FRONT_LIGHTS: { id: "LEFT_FRONT_LIGHTS", label: "Left headlight" },
+  RIGHT_MIRROR: { id: "LEFT_MIRROR", label: "Left mirror" },
+  BACK_PASSENGER_WINDOW: { id: "LEFT_REAR_WINDOW", label: "Left rear window" },
+  FRONT_PASSENGER_WINDOW: { id: "LEFT_FRONT_WINDOW", label: "Left front window" },
+};
+
+function createMirroredSideParts(parts: DamagePart[]): DamagePart[] {
+  return parts.map((part) => {
+    const mirroredMeta = MIRRORED_SIDE_PART_META[part.id];
+
+    if (!mirroredMeta) {
+      return part;
+    }
+
+    return {
+      ...part,
+      id: mirroredMeta.id,
+      label: mirroredMeta.label,
+    };
+  });
+}
+
+const DAMAGE_VIEWS_WITH_LEFT: Record<
+  DamageViewKey | "leftSide",
+  {
+    label: string;
+    imageSrc: string;
+    defaultViewBox: string;
+    parts: DamagePart[];
+    imageClassName?: string;
+    groupTransform?: string;
+  }
+> = {
+  ...DAMAGE_VIEWS,
+  leftSide: {
+    label: "Left Side View",
+    imageSrc: "/damage-map/side-view.png",
+    defaultViewBox: "0 0 640 220",
+    parts: createMirroredSideParts(DAMAGE_VIEWS.side.parts),
+    imageClassName: "[transform:scaleX(-1)]",
+    groupTransform: `translate(${SIDE_MIRROR_WIDTH} 0) scale(-1 1)`,
+  },
+};
+
+type ExtendedDamageViewKey = keyof typeof DAMAGE_VIEWS_WITH_LEFT;
+
+const DAMAGE_VIEW_KEYS = Object.keys(
+  DAMAGE_VIEWS_WITH_LEFT
+) as ExtendedDamageViewKey[];
 const DAMAGE_PARTS_BY_ID = new Map(
   DAMAGE_VIEW_KEYS.flatMap((view) =>
-    DAMAGE_VIEWS[view].parts.map((part) => [part.id, part] as const)
+    DAMAGE_VIEWS_WITH_LEFT[view].parts.map((part) => [part.id, part] as const)
   )
 );
 
@@ -148,12 +217,15 @@ function DamageMapSelector({
   initialValue = [],
   onChange,
 }: DamageMapSelectorProps) {
-  const [activeView, setActiveView] = useState<DamageViewKey>("side");
+  const { language } = usePreferences();
+  const [activeView, setActiveView] = useState<ExtendedDamageViewKey>("side");
   const [hoveredPartKey, setHoveredPartKey] = useState<string | null>(null);
-  const [viewBoxes, setViewBoxes] = useState<Partial<Record<DamageViewKey, string>>>({});
+  const [viewBoxes, setViewBoxes] = useState<
+    Partial<Record<ExtendedDamageViewKey, string>>
+  >({});
   const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(initialValue);
 
-  const activeConfig = DAMAGE_VIEWS[activeView];
+  const activeConfig = DAMAGE_VIEWS_WITH_LEFT[activeView];
   const selectedKeys = useMemo(
     () => new Set(selectedItems.map((item) => item.key)),
     [selectedItems]
@@ -191,7 +263,7 @@ function DamageMapSelector({
   );
 
   function handleImageLoad(
-    view: DamageViewKey,
+    view: ExtendedDamageViewKey,
     event: React.SyntheticEvent<HTMLImageElement>
   ) {
     const image = event.currentTarget;
@@ -201,21 +273,50 @@ function DamageMapSelector({
     }));
   }
 
+  const uiText =
+    language === "ru"
+      ? {
+          rightSide: "Вид справа",
+          leftSide: "Вид слева",
+          front: "Вид спереди",
+          clearAll: "Очистить всё",
+          selectedTitle: "Выбранные зоны повреждений",
+          selectedDescription:
+            "Необязательный шаг. Совпадающие ID остаются связанными между доступными видами.",
+          noDamage: "Повреждения не выбраны.",
+          remove: "Удалить",
+        }
+      : {
+          rightSide: "Right Side View",
+          leftSide: "Left Side View",
+          front: "Front View",
+          clearAll: "Clear all",
+          selectedTitle: "Selected damage areas",
+          selectedDescription:
+            "Optional step. Matching IDs stay linked across available views.",
+          noDamage: "No damage selected.",
+          remove: "Remove",
+        };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          {DAMAGE_VIEW_KEYS.map((view) => (
-            <Button
-              key={view}
-              type="button"
-              variant={activeView === view ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveView(view)}
-            >
-              {DAMAGE_VIEWS[view].label}
-            </Button>
-          ))}
+              {DAMAGE_VIEW_KEYS.map((view) => (
+                <Button
+                  key={view}
+                  type="button"
+                  variant={activeView === view ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveView(view)}
+                >
+                  {view === "side"
+                    ? uiText.rightSide
+                    : view === "leftSide"
+                      ? uiText.leftSide
+                      : uiText.front}
+                </Button>
+              ))}
         </div>
         <Button
           type="button"
@@ -224,7 +325,7 @@ function DamageMapSelector({
           disabled={selectedItems.length === 0}
           onClick={() => commitSelection([])}
         >
-          Clear all
+          {uiText.clearAll}
         </Button>
       </div>
 
@@ -240,7 +341,10 @@ function DamageMapSelector({
             <img
               src={activeConfig.imageSrc}
               alt={`${activeConfig.label} damage map`}
-              className="block h-auto max-w-full rounded-md"
+              className={cn(
+                "block h-auto max-w-full rounded-md",
+                activeConfig.imageClassName
+              )}
               onLoad={(event) => handleImageLoad(activeView, event)}
             />
 
@@ -248,36 +352,37 @@ function DamageMapSelector({
               className="absolute inset-0 h-full w-full"
               viewBox={viewBoxes[activeView] ?? activeConfig.defaultViewBox}
             >
-              {activeConfig.parts.map((part) => {
-                const selectionKey = part.id;
-                const isSelected = selectedKeys.has(selectionKey);
-                const isHovered = hoveredPartKey === selectionKey;
+              <g transform={activeConfig.groupTransform}>
+                {activeConfig.parts.map((part) => {
+                  const selectionKey = part.id;
+                  const isSelected = selectedKeys.has(selectionKey);
+                  const isHovered = hoveredPartKey === selectionKey;
 
-                return renderPart(
-                  part,
-                  isSelected,
-                  isHovered,
-                  () => handleToggle(part),
-                  () =>
-                    setHoveredPartKey(selectionKey),
-                  () => setHoveredPartKey(null)
-                );
-              })}
+                  return renderPart(
+                    part,
+                    isSelected,
+                    isHovered,
+                    () => handleToggle(part),
+                    () => setHoveredPartKey(selectionKey),
+                    () => setHoveredPartKey(null)
+                  );
+                })}
+              </g>
             </svg>
           </div>
         </div>
 
         <div className="rounded-xl border border-border bg-muted/20 p-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">Selected damage areas</p>
+            <p className="text-sm font-medium text-foreground">{uiText.selectedTitle}</p>
             <p className="text-xs text-muted-foreground">
-              Optional step. Matching IDs stay linked across available views.
+              {uiText.selectedDescription}
             </p>
           </div>
 
           {selectedItems.length === 0 ? (
             <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-              No damage selected.
+              {uiText.noDamage}
             </div>
           ) : (
             <div className="mt-4 space-y-2">
@@ -298,7 +403,7 @@ function DamageMapSelector({
                         selectedItems.filter((selected) => selected.key !== item.key)
                       )
                     }
-                    aria-label={`Remove ${item.label}`}
+                    aria-label={`${uiText.remove} ${item.label}`}
                   >
                     <X className="h-4 w-4" />
                   </button>
