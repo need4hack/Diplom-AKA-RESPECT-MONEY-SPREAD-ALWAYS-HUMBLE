@@ -11,7 +11,7 @@ class RegisterSerializer(serializers.Serializer):
     """Input validation for POST /api/auth/register/."""
     username = serializers.CharField(min_length=3, max_length=50)
     email = serializers.EmailField(max_length=100)
-    password = serializers.CharField(min_length=6, max_length=128, write_only=True)
+    password = serializers.CharField(min_length=8, max_length=128, write_only=True)
 
 
 class LoginSerializer(serializers.Serializer):

@@ -7,9 +7,13 @@ Separation of concerns (promt.md §7):
 """
 
 import hashlib
-import secrets
 import logging
+import secrets
+from typing import Optional
 
+from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.db.models import F
 
 from .models import Report, User
@@ -26,25 +30,74 @@ class AuthService:
     """
     Stateless service class for user authentication operations.
 
-    Uses SHA-256 hashing for passwords (production should use bcrypt/argon2,
-    but this avoids extra dependencies while keeping the architecture clean).
+    Uses Django's password hashing framework for new passwords and keeps
+    compatibility with the legacy salt$sha256 format already stored in DB.
     """
 
     @staticmethod
     def _hash_password(raw_password: str) -> str:
-        """Hash a raw password using SHA-256 with a salt prefix."""
-        salt = secrets.token_hex(16)
-        hashed = hashlib.sha256(f"{salt}${raw_password}".encode()).hexdigest()
-        return f"{salt}${hashed}"
+        """Hash a raw password using Django's configured password hasher."""
+        return make_password(raw_password)
 
     @staticmethod
-    def _verify_password(raw_password: str, stored_hash: str) -> bool:
-        """Verify a raw password against a stored salt$hash string."""
-        if '$' not in stored_hash:
+    def _is_legacy_password_hash(stored_hash: str) -> bool:
+        """
+        Detect the project's previous salt$sha256 password format.
+
+        Expected format:
+            <32-char hex salt>$<64-char sha256 hex digest>
+        """
+        if not stored_hash or '$' not in stored_hash:
             return False
+
+        salt, expected_hash = stored_hash.split('$', 1)
+        return (
+            len(salt) == 32
+            and len(expected_hash) == 64
+            and all(char in '0123456789abcdef' for char in salt.lower())
+            and all(char in '0123456789abcdef' for char in expected_hash.lower())
+        )
+
+    @staticmethod
+    def _verify_legacy_password(raw_password: str, stored_hash: str) -> bool:
+        """Verify a password against the legacy salt$sha256 format."""
+        if not AuthService._is_legacy_password_hash(stored_hash):
+            return False
+
         salt, expected_hash = stored_hash.split('$', 1)
         computed = hashlib.sha256(f"{salt}${raw_password}".encode()).hexdigest()
         return secrets.compare_digest(computed, expected_hash)
+
+    @staticmethod
+    def _verify_password(raw_password: str, stored_hash: str) -> bool:
+        """Verify a raw password against the stored hash."""
+        if not stored_hash:
+            return False
+
+        if AuthService._is_legacy_password_hash(stored_hash):
+            return AuthService._verify_legacy_password(raw_password, stored_hash)
+
+        try:
+            return check_password(raw_password, stored_hash)
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _upgrade_legacy_password_if_needed(user: User, raw_password: str) -> None:
+        """Re-hash legacy passwords with Django's password hasher after login."""
+        if not AuthService._is_legacy_password_hash(user.password_hash):
+            return
+
+        user.password_hash = AuthService._hash_password(raw_password)
+        user.save(update_fields=['password_hash'])
+
+    @staticmethod
+    def _validate_password_strength(password: str, user: Optional[User] = None) -> None:
+        """Apply Django's password validation and convert errors to AuthError."""
+        try:
+            validate_password(password, user=user)
+        except ValidationError as exc:
+            raise AuthError(' '.join(exc.messages)) from exc
 
     @staticmethod
     def register(username: str, email: str, password: str, role: str = 'user') -> User:
@@ -69,8 +122,6 @@ class AuthService:
 
         if len(username) < 3:
             raise AuthError('Username must be at least 3 characters.')
-        if len(password) < 6:
-            raise AuthError('Password must be at least 6 characters.')
         if '@' not in email:
             raise AuthError('Invalid email address.')
 
@@ -79,6 +130,8 @@ class AuthService:
             raise AuthError(f'Username "{username}" is already taken.')
         if User.objects.filter(email=email).exists():
             raise AuthError(f'Email "{email}" is already registered.')
+
+        AuthService._validate_password_strength(password)
 
         # Create user
         password_hash = AuthService._hash_password(password)
@@ -116,6 +169,8 @@ class AuthService:
 
         if not AuthService._verify_password(password, user.password_hash):
             raise AuthError('Invalid username or password.')
+
+        AuthService._upgrade_legacy_password_if_needed(user, password)
 
         logger.info(f"User authenticated: {username}")
         return user

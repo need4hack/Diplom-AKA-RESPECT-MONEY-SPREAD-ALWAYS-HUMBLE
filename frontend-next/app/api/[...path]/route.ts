@@ -6,10 +6,10 @@
  * + Django APPEND_SLASH interaction.
  *
  * Service routing:
- *   /api/vehicles/* → 127.0.0.1:8001
- *   /api/vin/*      → 127.0.0.1:8002
- *   /api/valuation/* → 127.0.0.1:8003
- *   /api/auth/*     → 127.0.0.1:8004
+ *   /api/vehicles/*  -> 127.0.0.1:8001
+ *   /api/vin/*       -> 127.0.0.1:8002
+ *   /api/valuation/* -> 127.0.0.1:8003
+ *   /api/auth/*      -> 127.0.0.1:8004
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,11 +19,21 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
+const ACCESS_COOKIE = "carspecs_access";
+const REFRESH_COOKIE = "carspecs_refresh";
+
 const SERVICE_MAP: Record<string, string> = {
   vehicles: process.env.VEHICLE_SERVICE_URL || "http://127.0.0.1:8001",
   vin: process.env.VIN_SERVICE_URL || "http://127.0.0.1:8002",
   valuation: process.env.VALUATION_SERVICE_URL || "http://127.0.0.1:8003",
   auth: process.env.AUTH_SERVICE_URL || "http://127.0.0.1:8004",
+};
+
+const AUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
 };
 
 type JwtActor = {
@@ -39,6 +49,23 @@ function shouldTrackRequestCount(requestPath: string, method: string) {
   );
 }
 
+function shouldManageSessionCookies(requestPath: string) {
+  return (
+    requestPath === "/api/auth/login/" ||
+    requestPath === "/api/auth/register/" ||
+    requestPath === "/api/auth/refresh/"
+  );
+}
+
+function shouldInjectAuthorization(requestPath: string) {
+  return !(
+    requestPath === "/api/auth/login/" ||
+    requestPath === "/api/auth/register/" ||
+    requestPath === "/api/auth/refresh/" ||
+    requestPath === "/api/auth/logout/"
+  );
+}
+
 function decodeBase64Url(value: string): string | null {
   try {
     const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -49,13 +76,26 @@ function decodeBase64Url(value: string): string | null {
   }
 }
 
-function getJwtActor(req: NextRequest): JwtActor {
+function getBearerToken(req: NextRequest): string | null {
   const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice("Bearer ".length).trim();
+  }
+
+  return req.cookies.get(ACCESS_COOKIE)?.value ?? null;
+}
+
+function getAuthorizationHeader(req: NextRequest): string | null {
+  const token = getBearerToken(req);
+  return token ? `Bearer ${token}` : null;
+}
+
+function getJwtActor(req: NextRequest): JwtActor {
+  const token = getBearerToken(req);
+  if (!token) {
     return { userId: null, username: null, role: null };
   }
 
-  const token = authHeader.slice("Bearer ".length).trim();
   const parts = token.split(".");
   if (parts.length < 2) {
     return { userId: null, username: null, role: null };
@@ -86,20 +126,56 @@ function getJwtActor(req: NextRequest): JwtActor {
 
 function getBackendUrl(path: string[]): string | null {
   if (path.length < 1) return null;
-  const service = path[0]; // "vehicles", "vin", "valuation", "auth"
+  const service = path[0];
   const baseUrl = SERVICE_MAP[service];
   if (!baseUrl) return null;
-  // Filter out any empty strings to prevent double slashes
+
   const cleanPath = path.filter(Boolean).join("/");
-  // Always add one trailing slash — Django requires it (APPEND_SLASH)
   return `${baseUrl}/api/${cleanPath}/`;
+}
+
+function tryParseJsonObject(text: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasRefreshTokenInBody(body: string | undefined): boolean {
+  if (!body) {
+    return false;
+  }
+
+  const payload = tryParseJsonObject(body);
+  return typeof payload?.refresh === "string" && payload.refresh.length > 0;
+}
+
+function clearAuthCookies(response: NextResponse) {
+  response.cookies.set(ACCESS_COOKIE, "", { ...AUTH_COOKIE_OPTIONS, maxAge: 0 });
+  response.cookies.set(REFRESH_COOKIE, "", { ...AUTH_COOKIE_OPTIONS, maxAge: 0 });
+}
+
+function applyAuthCookies(response: NextResponse, payload: Record<string, unknown> | null) {
+  if (!payload) {
+    return;
+  }
+
+  if (typeof payload.access === "string" && payload.access.length > 0) {
+    response.cookies.set(ACCESS_COOKIE, payload.access, AUTH_COOKIE_OPTIONS);
+  }
+
+  if (typeof payload.refresh === "string" && payload.refresh.length > 0) {
+    response.cookies.set(REFRESH_COOKIE, payload.refresh, AUTH_COOKIE_OPTIONS);
+  }
 }
 
 async function trackAuthenticatedRequest(req: NextRequest) {
   const authServiceUrl = SERVICE_MAP.auth;
-  const authHeader = req.headers.get("authorization");
+  const authorizationHeader = getAuthorizationHeader(req);
 
-  if (!authServiceUrl || !authHeader?.startsWith("Bearer ")) {
+  if (!authServiceUrl || !authorizationHeader) {
     return;
   }
 
@@ -107,7 +183,7 @@ async function trackAuthenticatedRequest(req: NextRequest) {
     await fetch(`${authServiceUrl}/api/auth/track-request/`, {
       method: "POST",
       headers: {
-        Authorization: authHeader,
+        Authorization: authorizationHeader,
       },
       cache: "no-store",
     });
@@ -125,38 +201,57 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     return NextResponse.json({ detail: "Unknown service" }, { status: 404 });
   }
 
-  // Preserve query string
   const url = new URL(req.url);
   const fullUrl = url.search ? `${backendUrl}${url.search}` : backendUrl;
   const requestPath = `/api/${path.filter(Boolean).join("/")}/`;
   const startedAt = Date.now();
   const actor = getJwtActor(req);
 
+  if (requestPath === "/api/auth/logout/" && req.method === "POST") {
+    const logoutResponse = NextResponse.json({ ok: true }, { status: 200 });
+    clearAuthCookies(logoutResponse);
+    return logoutResponse;
+  }
+
   try {
-    // Forward headers (except host)
     const headers = new Headers();
     req.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== "host") {
-        headers.set(key, value);
+      const normalizedKey = key.toLowerCase();
+      if (normalizedKey === "host" || normalizedKey === "cookie" || normalizedKey === "content-length") {
+        return;
       }
+      headers.set(key, value);
     });
 
-    const fetchOptions: RequestInit = {
-      method: req.method,
-      headers,
-      redirect: "follow",
-      cache: "no-store",
-    };
-
-    // Forward body for non-GET requests
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      fetchOptions.body = await req.text();
+    if (!headers.has("Authorization") && shouldInjectAuthorization(requestPath)) {
+      const authorizationHeader = getAuthorizationHeader(req);
+      if (authorizationHeader) {
+        headers.set("Authorization", authorizationHeader);
+      }
     }
 
-    const response = await fetch(fullUrl, fetchOptions);
-    const durationMs = Date.now() - startedAt;
+    let requestBody: string | undefined;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      requestBody = await req.text();
 
-    // Forward response
+      if (requestPath === "/api/auth/refresh/" && !hasRefreshTokenInBody(requestBody)) {
+        const refreshToken = req.cookies.get(REFRESH_COOKIE)?.value;
+        if (refreshToken) {
+          requestBody = JSON.stringify({ refresh: refreshToken });
+          headers.set("Content-Type", "application/json");
+        }
+      }
+    }
+
+    const response = await fetch(fullUrl, {
+      method: req.method,
+      headers,
+      body: requestBody,
+      redirect: "follow",
+      cache: "no-store",
+    });
+
+    const durationMs = Date.now() - startedAt;
     const responseBody = await response.text();
 
     if (service) {
@@ -177,13 +272,24 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       await trackAuthenticatedRequest(req);
     }
 
-    return new NextResponse(responseBody, {
+    const nextResponse = new NextResponse(responseBody, {
       status: response.status,
       statusText: response.statusText,
       headers: {
         "Content-Type": response.headers.get("Content-Type") || "application/json",
       },
     });
+
+    if (shouldManageSessionCookies(requestPath)) {
+      const payload = tryParseJsonObject(responseBody);
+      if (response.ok) {
+        applyAuthCookies(nextResponse, payload);
+      } else if (requestPath === "/api/auth/refresh/" && response.status === 401) {
+        clearAuthCookies(nextResponse);
+      }
+    }
+
+    return nextResponse;
   } catch (error) {
     const durationMs = Date.now() - startedAt;
 
@@ -204,7 +310,7 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     console.error(`[API Proxy Error] ${req.method} ${fullUrl}:`, error);
     return NextResponse.json(
       { detail: `Backend service unavailable: ${path[0]}` },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }

@@ -5,20 +5,31 @@ Thin controllers — delegates to services.py (promt.md §7).
 Handles HTTP concerns: request parsing, response formatting, error handling.
 """
 
+from django.apps import apps
+from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .services import AuthService, AuthError
-from .backends import CustomRefreshToken, CustomJWTAuthentication
+from .backends import CustomRefreshToken
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
     ReportSerializer,
     UserProfileSerializer,
-    TokenResponseSerializer,
 )
+
+
+def _should_rotate_refresh_tokens() -> bool:
+    """Rotate refresh tokens only when explicitly enabled and blacklist is available."""
+    simple_jwt_settings = getattr(settings, 'SIMPLE_JWT', {})
+    return (
+        simple_jwt_settings.get('ROTATE_REFRESH_TOKENS', False)
+        and apps.is_installed('rest_framework_simplejwt.token_blacklist')
+    )
 
 
 @api_view(['POST'])
@@ -99,7 +110,8 @@ def refresh_token(request):
     POST /api/auth/refresh/
     Body: {"refresh": "<refresh_token>"}
 
-    Returns a new access token (and optionally a rotated refresh token).
+    Returns a new access token and only rotates the refresh token when
+    blacklist support is configured.
     """
     refresh = request.data.get('refresh')
     if not refresh:
@@ -114,19 +126,16 @@ def refresh_token(request):
 
         response_data = {'access': new_access}
 
-        # If ROTATE_REFRESH_TOKENS is enabled, generate a new refresh token
-        old_token.blacklist() if hasattr(old_token, 'blacklist') else None
-        new_refresh = CustomRefreshToken()
-        new_refresh['user_id'] = old_token['user_id']
-        new_refresh['username'] = old_token['username']
-        new_refresh['role'] = old_token['role']
-        response_data['refresh'] = str(new_refresh)
+        if _should_rotate_refresh_tokens():
+            old_token.blacklist()
+            user = AuthService.get_user_by_id(old_token['user_id'])
+            response_data['refresh'] = str(CustomRefreshToken.for_user(user))
 
         return Response(response_data)
 
-    except Exception as e:
+    except (TokenError, AuthError):
         return Response(
-            {'error': f'Invalid or expired refresh token: {str(e)}'},
+            {'error': 'Invalid or expired refresh token.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 

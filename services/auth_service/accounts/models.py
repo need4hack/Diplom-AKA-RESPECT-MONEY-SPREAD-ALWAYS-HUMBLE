@@ -6,7 +6,7 @@ Uses `managed = False` — the table already exists in the shared DB.
 
 IMPORTANT: This is NOT Django's built-in User model. We use a custom model
 that maps to an existing table with UUID primary keys and its own
-password hashing (bcrypt via hashlib or passlib).
+password hashing handled by Django's password hasher framework.
 """
 
 import uuid
@@ -22,7 +22,7 @@ class User(models.Model):
         id: UUID primary key (auto-generated)
         username: unique login name
         email: unique email address
-        password_hash: bcrypt hash stored as text
+        password_hash: secure Django password hash stored as text
         role: user role (admin, user, guest)
         api_key: optional API key for external access
         request_limit: max API requests allowed

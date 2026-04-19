@@ -6,9 +6,13 @@
  * adds them before forwarding to Django.
  */
 
-import { getAccessToken } from "@/lib/auth";
-
 export const PROFILE_SYNC_EVENT = "app:profile-sync-needed";
+const AUTH_RETRY_EXCLUDED = new Set([
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/refresh",
+  "/api/auth/logout",
+]);
 
 function shouldSyncProfile(url: string) {
   return url === "/api/vin/decode" || url === "/api/valuation/calculate";
@@ -48,28 +52,39 @@ function buildRequestHeaders(init?: RequestInit): Headers {
     headers.set("Content-Type", "application/json");
   }
 
-  // Attach the current access token for all browser-side API calls so
-  // the proxy can attribute activity to the authenticated user.
-  if (!headers.has("Authorization")) {
-    const accessToken = getAccessToken();
-    if (accessToken) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
-    }
-  }
-
   return headers;
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+async function tryRefreshSession(): Promise<boolean> {
+  const response = await fetch("/api/auth/refresh", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  return response.ok;
+}
+
+async function request<T>(url: string, init?: RequestInit, hasRetriedAuth = false): Promise<T> {
   const shouldRequestProfileSync =
-    typeof window !== "undefined" &&
-    shouldSyncProfile(url) &&
-    buildRequestHeaders(init).has("Authorization");
+    typeof window !== "undefined" && shouldSyncProfile(url);
 
   const res = await fetch(url, {
     ...init,
     headers: buildRequestHeaders(init),
+    credentials: "same-origin",
   });
+
+  if (res.status === 401 && !hasRetriedAuth && !AUTH_RETRY_EXCLUDED.has(url)) {
+    const refreshed = await tryRefreshSession().catch(() => false);
+    if (refreshed) {
+      return request<T>(url, init, true);
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({} as Record<string, unknown>));
@@ -97,10 +112,6 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   return data;
-}
-
-function authHeaders(token?: string | null): HeadersInit {
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export interface LoginPayload {
@@ -142,15 +153,18 @@ export const auth = {
       body: JSON.stringify(data),
     }),
 
-  refresh: (refreshToken: string) =>
+  refresh: () =>
     request<{ access: string; refresh?: string }>("/api/auth/refresh", {
       method: "POST",
-      body: JSON.stringify({ refresh: refreshToken }),
+      body: "{}",
     }),
 
-  me: (token: string) =>
-    request<UserProfile>("/api/auth/me", {
-      headers: authHeaders(token),
+  me: () => request<UserProfile>("/api/auth/me"),
+
+  logout: () =>
+    request<{ ok: boolean }>("/api/auth/logout", {
+      method: "POST",
+      body: "{}",
     }),
 };
 

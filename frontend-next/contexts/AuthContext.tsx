@@ -1,26 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   PROFILE_SYNC_EVENT,
   auth as authApi,
-  type UserProfile,
   type LoginPayload,
   type RegisterPayload,
+  type UserProfile,
 } from "@/lib/api";
-import {
-  getAccessToken,
-  getRefreshToken,
-  setTokens,
-  clearTokens,
-  isTokenExpired,
-} from "@/lib/auth";
-
-/* ─── types ───────────────────────────────────────────────── */
 
 interface AuthState {
   user: UserProfile | null;
-  token: string | null;
   loading: boolean;
   login: (data: LoginPayload) => Promise<void>;
   register: (data: RegisterPayload) => Promise<void>;
@@ -30,76 +20,59 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-/* ─── provider ────────────────────────────────────────────── */
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* fetch profile from /me/ endpoint */
-  const fetchProfile = useCallback(async (accessToken: string) => {
-    try {
-      const profile = await authApi.me(accessToken);
-      setUser(profile);
-      setToken(accessToken);
-    } catch {
-      clearTokens();
-      setUser(null);
-      setToken(null);
-    }
+  const clearAuthState = useCallback(() => {
+    setUser(null);
   }, []);
 
-  /* on mount — try to restore session */
+  const fetchProfile = useCallback(async () => {
+    const profile = await authApi.me();
+    setUser(profile);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      let access = getAccessToken();
-      const refresh = getRefreshToken();
-
-      if (access && !isTokenExpired(access)) {
-        await fetchProfile(access);
-      } else if (refresh && !isTokenExpired(refresh)) {
-        try {
-          const data = await authApi.refresh(refresh);
-          access = data.access;
-          setTokens(access, refresh);
-          await fetchProfile(access);
-        } catch {
-          clearTokens();
-        }
+      try {
+        await fetchProfile();
+      } catch {
+        clearAuthState();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [fetchProfile]);
+  }, [clearAuthState, fetchProfile]);
 
-  /* login */
-  const login = useCallback(async (data: LoginPayload) => {
-    const tokens = await authApi.login(data);
-    setTokens(tokens.access, tokens.refresh);
-    await fetchProfile(tokens.access);
-  }, [fetchProfile]);
+  const login = useCallback(
+    async (data: LoginPayload) => {
+      await authApi.login(data);
+      await fetchProfile();
+    },
+    [fetchProfile],
+  );
 
-  /* register */
-  const register = useCallback(async (data: RegisterPayload) => {
-    const tokens = await authApi.register(data);
-    setTokens(tokens.access, tokens.refresh);
-    await fetchProfile(tokens.access);
-  }, [fetchProfile]);
+  const register = useCallback(
+    async (data: RegisterPayload) => {
+      await authApi.register(data);
+      await fetchProfile();
+    },
+    [fetchProfile],
+  );
 
   const refreshProfile = useCallback(async () => {
-    const accessToken = getAccessToken();
-
-    if (!accessToken || isTokenExpired(accessToken)) {
-      return;
+    try {
+      await fetchProfile();
+    } catch {
+      clearAuthState();
     }
-
-    await fetchProfile(accessToken);
-  }, [fetchProfile]);
+  }, [clearAuthState, fetchProfile]);
 
   useEffect(() => {
     function scheduleProfileSync() {
-      if (!getAccessToken()) {
+      if (!user) {
         return;
       }
 
@@ -120,23 +93,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [refreshProfile]);
+  }, [refreshProfile, user]);
 
-  /* logout */
   const logout = useCallback(() => {
-    clearTokens();
-    setUser(null);
-    setToken(null);
-  }, []);
+    void authApi.logout().catch(() => undefined);
+    clearAuthState();
+  }, [clearAuthState]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, refreshProfile, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, refreshProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-/* ─── hook ────────────────────────────────────────────────── */
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
