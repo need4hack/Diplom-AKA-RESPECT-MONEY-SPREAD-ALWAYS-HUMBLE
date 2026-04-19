@@ -1,7 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ChartColumn, KeyRound, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  ChartColumn,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Sparkles,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,6 +95,7 @@ export default function UserWorkspace() {
   const { user } = useAuth();
   const { entries } = usePortalHistory();
   const { language, formatAedPrice } = usePreferences();
+  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const text = TEXT[language];
 
   const requestLimit = user?.request_limit ?? 0;
@@ -198,12 +208,41 @@ export default function UserWorkspace() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-xl border border-border bg-muted/40 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                API Key
-              </p>
-              <p className="mt-2 break-all font-mono text-sm text-foreground">
-                {maskApiKey(user?.api_key ?? null) ?? text.apiMissing}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    API Key
+                  </p>
+                  <p className="mt-2 break-all font-mono text-sm text-foreground">
+                    {user?.api_key
+                      ? isApiKeyVisible
+                        ? user.api_key
+                        : maskApiKey(user.api_key)
+                      : text.apiMissing}
+                  </p>
+                </div>
+                {user?.api_key ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setIsApiKeyVisible((current) => !current)}
+                  >
+                    {isApiKeyVisible ? (
+                      <>
+                        <EyeOff className="h-4 w-4" />
+                        Hide
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4" />
+                        Show
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-border px-4 py-3">

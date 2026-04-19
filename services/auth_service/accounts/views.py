@@ -16,11 +16,35 @@ from rest_framework_simplejwt.exceptions import TokenError
 from .services import AuthService, AuthError
 from .backends import CustomRefreshToken
 from .serializers import (
+    AdminApiKeySerializer,
+    AdminUserCreateSerializer,
+    AdminUserSerializer,
+    AdminUserUpdateSerializer,
+    ChangePasswordSerializer,
     RegisterSerializer,
     LoginSerializer,
     ReportSerializer,
     UserProfileSerializer,
 )
+
+
+ADMIN_ROLE_KEYWORDS = ('admin', 'superuser', 'staff', 'manager', 'root')
+
+
+def _user_has_admin_access(user) -> bool:
+    role = getattr(user, 'role', '') or ''
+    normalized_role = role.strip().lower()
+    return any(keyword in normalized_role for keyword in ADMIN_ROLE_KEYWORDS)
+
+
+def _ensure_admin(request):
+    if _user_has_admin_access(request.user):
+        return None
+
+    return Response(
+        {'error': 'Admin access required.'},
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 def _should_rotate_refresh_tokens() -> bool:
@@ -156,6 +180,27 @@ def me(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def change_password(request):
+    """
+    POST /api/auth/change-password/
+    """
+    serializer = ChangePasswordSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+        AuthService.change_password(
+            request.user.id,
+            current_password=serializer.validated_data['current_password'],
+            new_password=serializer.validated_data['new_password'],
+        )
+    except AuthError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'ok': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def track_request(request):
     """
     POST /api/auth/track-request/
@@ -211,3 +256,89 @@ def report_detail(request, report_id: int):
         return Response({'error': 'Report not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def users(request):
+    """
+    GET /api/auth/users/
+
+    Returns active users for the admin users page.
+    """
+    admin_error = _ensure_admin(request)
+    if admin_error:
+        return admin_error
+
+    if request.method == 'POST':
+        serializer = AdminUserCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            user = AuthService.create_admin_user(
+                username=serializer.validated_data['username'],
+                email=serializer.validated_data['email'],
+                password=serializer.validated_data['password'],
+                role=serializer.validated_data.get('role', 'user'),
+                request_limit=serializer.validated_data.get('request_limit', 1000),
+            )
+        except AuthError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(AdminUserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+    users_qs = AuthService.list_active_users()
+    serializer = AdminUserSerializer(users_qs, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def user_detail(request, user_id):
+    """
+    PATCH /api/auth/users/<id>/   -> update request counters
+    DELETE /api/auth/users/<id>/  -> soft-delete user
+    """
+    admin_error = _ensure_admin(request)
+    if admin_error:
+        return admin_error
+
+    if request.method == 'PATCH':
+        serializer = AdminUserUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            user = AuthService.update_user_request_settings(
+                user_id,
+                request_limit=serializer.validated_data.get('request_limit'),
+                request_count=serializer.validated_data.get('request_count'),
+            )
+        except AuthError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(AdminUserSerializer(user).data)
+
+    try:
+        AuthService.deactivate_user(user_id, acting_user_id=request.user.id)
+    except AuthError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def regenerate_user_api_key(request, user_id):
+    """
+    POST /api/auth/users/<id>/regenerate-api-key/
+    """
+    admin_error = _ensure_admin(request)
+    if admin_error:
+        return admin_error
+
+    try:
+        user = AuthService.regenerate_api_key(user_id)
+    except AuthError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(AdminApiKeySerializer(user).data, status=status.HTTP_200_OK)

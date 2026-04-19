@@ -140,6 +140,33 @@ export interface UserProfile {
   request_limit: number;
 }
 
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  api_key: string | null;
+  request_count: number;
+  request_limit: number;
+  remaining_requests: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminUserCreatePayload {
+  username: string;
+  email: string;
+  password: string;
+  role?: string;
+  request_limit?: number;
+}
+
 export const auth = {
   login: (data: LoginPayload) =>
     request<TokenResponse>("/api/auth/login", {
@@ -160,6 +187,12 @@ export const auth = {
     }),
 
   me: () => request<UserProfile>("/api/auth/me"),
+
+  changePassword: (data: ChangePasswordPayload) =>
+    request<{ ok: boolean }>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   logout: () =>
     request<{ ok: boolean }>("/api/auth/logout", {
@@ -209,6 +242,39 @@ export const reports = {
     request<void>(`/api/auth/reports/${reportId}`, {
       method: "DELETE",
     }),
+};
+
+export const adminUsers = {
+  list: () => request<AdminUserRecord[]>("/api/auth/users"),
+
+  create: (data: AdminUserCreatePayload) =>
+    request<AdminUserRecord>("/api/auth/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (
+    userId: string,
+    data: Partial<Pick<AdminUserRecord, "request_count" | "request_limit">>,
+  ) =>
+    request<AdminUserRecord>(`/api/auth/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  remove: (userId: string) =>
+    request<void>(`/api/auth/users/${userId}`, {
+      method: "DELETE",
+    }),
+
+  regenerateApiKey: (userId: string) =>
+    request<{ id: string; username: string; api_key: string | null }>(
+      `/api/auth/users/${userId}/regenerate-api-key`,
+      {
+        method: "POST",
+        body: "{}",
+      },
+    ),
 };
 
 export interface VehicleOption {

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Currency, Languages, LogOut, Menu, User } from "lucide-react";
+import { Currency, Languages, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import UserAvatarMenu from "@/components/layout/UserAvatarMenu";
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,10 @@ const TOPBAR_TEXT = {
     logout: "Выйти",
     language: "Язык",
     currency: "Валюта",
+    liveRates: "CBR",
+    fallbackRates: "FX",
+    liveRatesTitle: "Курс загружен через CBR money.js",
+    fallbackRatesTitle: "Используется резервный курс",
     russian: "Русский",
     english: "English",
   },
@@ -54,6 +59,10 @@ const TOPBAR_TEXT = {
     logout: "Logout",
     language: "Language",
     currency: "Currency",
+    liveRates: "CBR",
+    fallbackRates: "FX",
+    liveRatesTitle: "Rates loaded via CBR money.js",
+    fallbackRatesTitle: "Fallback exchange rate is being used",
     russian: "Russian",
     english: "English",
   },
@@ -61,8 +70,14 @@ const TOPBAR_TEXT = {
 
 export default function TopBar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const { language, currency, setLanguage, setCurrency } = usePreferences();
+  const { user } = useAuth();
+  const {
+    language,
+    currency,
+    exchangeRateSource,
+    setLanguage,
+    setCurrency,
+  } = usePreferences();
   const [open, setOpen] = useState(false);
 
   const text = TOPBAR_TEXT[language];
@@ -106,7 +121,7 @@ export default function TopBar() {
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                       isActive
                         ? "bg-zinc-800 text-white"
-                        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-white"
+                        : "text-zinc-400 hover:bg-zinc-800/60 hover:text-white",
                     )}
                   >
                     <Icon size={20} className="shrink-0" />
@@ -152,27 +167,41 @@ export default function TopBar() {
           </SelectContent>
         </Select>
 
+        <div
+          className={cn(
+            "hidden items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium sm:flex",
+            exchangeRateSource === "live-cbr"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "border-border bg-muted text-muted-foreground",
+          )}
+          title={
+            exchangeRateSource === "live-cbr"
+              ? text.liveRatesTitle
+              : text.fallbackRatesTitle
+          }
+        >
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              exchangeRateSource === "live-cbr"
+                ? "bg-emerald-500"
+                : "bg-muted-foreground/70",
+            )}
+          />
+          <span>
+            {exchangeRateSource === "live-cbr" ? text.liveRates : text.fallbackRates}
+          </span>
+        </div>
+
         <ThemeToggle />
 
         {user ? (
           <>
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted">
-                <User size={16} className="text-muted-foreground" />
-              </div>
-              <div className="hidden text-right leading-tight sm:block">
-                <p className="text-sm font-medium text-foreground">{user.username}</p>
-                <p className="text-[11px] text-muted-foreground">{user.email}</p>
-              </div>
+            <div className="hidden text-right leading-tight sm:block">
+              <p className="text-sm font-medium text-foreground">{user.username}</p>
+              <p className="text-[11px] text-muted-foreground">{user.email}</p>
             </div>
-
-            <button
-              onClick={logout}
-              className="ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title={text.logout}
-            >
-              <LogOut size={18} />
-            </button>
+            <UserAvatarMenu language={language} />
           </>
         ) : (
           <Link

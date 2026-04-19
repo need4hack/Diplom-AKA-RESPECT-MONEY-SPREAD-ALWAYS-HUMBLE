@@ -176,6 +176,25 @@ class AuthService:
         return user
 
     @staticmethod
+    def change_password(user_id, current_password: str, new_password: str) -> User:
+        """Change a user's password after verifying the current password."""
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        if not AuthService._verify_password(current_password, user.password_hash):
+            raise AuthError('Current password is incorrect.')
+
+        if current_password == new_password:
+            raise AuthError('New password must be different from the current password.')
+
+        AuthService._validate_password_strength(new_password, user=user)
+        user.password_hash = AuthService._hash_password(new_password)
+        user.save(update_fields=['password_hash'])
+        return user
+
+    @staticmethod
     def get_user_by_id(user_id) -> User:
         """Fetch a user by primary key."""
         try:
@@ -199,6 +218,84 @@ class AuthService:
             raise AuthError('User not found.')
 
         return AuthService.get_user_by_id(user_id)
+
+    @staticmethod
+    def list_active_users():
+        """Return all active users for the admin users page."""
+        return User.objects.filter(is_active=True).order_by('-created_at')
+
+    @staticmethod
+    def create_admin_user(
+        *,
+        username: str,
+        email: str,
+        password: str,
+        role: str = 'user',
+        request_limit: int = 1000,
+    ) -> User:
+        """Create a user from the admin panel with a configurable request limit."""
+        user = AuthService.register(
+            username=username,
+            email=email,
+            password=password,
+            role=role,
+        )
+
+        if request_limit != user.request_limit:
+            user.request_limit = request_limit
+            user.save(update_fields=['request_limit'])
+
+        return user
+
+    @staticmethod
+    def update_user_request_settings(
+        user_id,
+        *,
+        request_limit: Optional[int] = None,
+        request_count: Optional[int] = None,
+    ) -> User:
+        """Update request counters for a user with basic consistency checks."""
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        next_request_limit = user.request_limit if request_limit is None else request_limit
+        next_request_count = user.request_count if request_count is None else request_count
+
+        if next_request_limit < 0 or next_request_count < 0:
+            raise AuthError('Request values cannot be negative.')
+
+        if next_request_count > next_request_limit:
+            raise AuthError('Request count cannot be greater than request limit.')
+
+        user.request_limit = next_request_limit
+        user.request_count = next_request_count
+        user.save(update_fields=['request_limit', 'request_count'])
+        return user
+
+    @staticmethod
+    def deactivate_user(user_id, *, acting_user_id=None) -> None:
+        """Soft-delete a user by marking the account inactive."""
+        if acting_user_id is not None and str(user_id) == str(acting_user_id):
+            raise AuthError('You cannot delete your own account.')
+
+        updated = User.objects.filter(pk=user_id, is_active=True).update(is_active=False)
+
+        if not updated:
+            raise AuthError('User not found.')
+
+    @staticmethod
+    def regenerate_api_key(user_id) -> User:
+        """Generate a new API key for an active user."""
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        user.api_key = secrets.token_hex(32)
+        user.save(update_fields=['api_key'])
+        return user
 
     @staticmethod
     def list_reports(user_id):
