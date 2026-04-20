@@ -128,4 +128,5 @@ class ReportSerializer(serializers.Serializer):
     low = serializers.DecimalField(max_digits=12, decimal_places=2)
     vehicleSnapshot = serializers.JSONField(source='vehicle_snapshot', required=False, default=dict)
     damageSelections = serializers.JSONField(source='damage_selections', required=False, default=list)
+    damageSummary = serializers.JSONField(source='damage_summary', required=False, default=dict)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)

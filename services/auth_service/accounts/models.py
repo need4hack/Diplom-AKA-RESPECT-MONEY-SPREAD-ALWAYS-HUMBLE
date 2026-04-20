@@ -95,6 +95,7 @@ class Report(models.Model):
     low = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     vehicle_snapshot = models.JSONField(default=dict, blank=True)
     damage_selections = models.JSONField(default=list, blank=True)
+    damage_summary = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

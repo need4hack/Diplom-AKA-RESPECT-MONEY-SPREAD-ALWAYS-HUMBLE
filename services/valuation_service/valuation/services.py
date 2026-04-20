@@ -26,6 +26,7 @@ from datetime import date
 from typing import Optional
 
 from .models import ModelDB, Depreciation, MileageCategory
+from .damage_catalog import summarize_damage
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,16 @@ class ValuationService:
 
     HIGH_MULTIPLIER = 1.10
     LOW_MULTIPLIER = 0.90
+
+    @staticmethod
+    def _apply_damage_adjustment(base_value: int, repair_cost: int, damage_pct: float) -> int:
+        if base_value <= 0:
+            return 0
+
+        pct_adjustment = round(base_value * max(damage_pct, 0) / 100)
+        requested_adjustment = max(repair_cost, pct_adjustment)
+        capped_adjustment = min(requested_adjustment, round(base_value * 0.95))
+        return max(capped_adjustment, 0)
 
     @staticmethod
     def get_vehicle(vehicle_id: int) -> ModelDB:
@@ -124,6 +135,8 @@ class ValuationService:
         actual_mileage: int,
         is_new: bool = False,
         valuation_year: Optional[int] = None,
+        damage_part_ids: Optional[list[str]] = None,
+        damage_selections: Optional[list[dict]] = None,
     ) -> dict:
         """
         Main valuation pipeline.
@@ -199,6 +212,43 @@ class ValuationService:
         high = max(round(medium * ValuationService.HIGH_MULTIPLIER), 0)
         low = max(round(medium * ValuationService.LOW_MULTIPLIER), 0)
 
+        base_medium = medium
+        base_high = high
+        base_low = low
+
+        damage_summary = summarize_damage(
+            make=vehicle.make or "",
+            selected_damage=damage_selections or damage_part_ids,
+        )
+
+        if damage_summary:
+            high_adjustment = ValuationService._apply_damage_adjustment(
+                base_high,
+                int(damage_summary["total_min_price"]),
+                float(damage_summary["total_pct_min"]),
+            )
+            medium_adjustment = ValuationService._apply_damage_adjustment(
+                base_medium,
+                int(damage_summary["total_typical_price"]),
+                float(damage_summary["total_pct_typical"]),
+            )
+            low_adjustment = ValuationService._apply_damage_adjustment(
+                base_low,
+                int(damage_summary["total_max_price"]),
+                float(damage_summary["total_pct_max"]),
+            )
+
+            high = max(base_high - high_adjustment, 0)
+            medium = max(base_medium - medium_adjustment, 0)
+            low = max(base_low - low_adjustment, 0)
+
+            damage_summary = {
+                **damage_summary,
+                "high_adjustment": high_adjustment,
+                "medium_adjustment": medium_adjustment,
+                "low_adjustment": low_adjustment,
+            }
+
         logger.info(
             f"Valuation: vehicle_id={vehicle_id}, age={age}, "
             f"dep_rate={depreciation_rate}%, mileage_delta={mileage_delta}km, "
@@ -219,8 +269,12 @@ class ValuationService:
             'actual_mileage': actual_mileage,
             'mileage_delta': mileage_delta,
             'mileage_adjustment': mileage_adjustment,
+            'base_high': base_high,
+            'base_medium': base_medium,
+            'base_low': base_low,
             'high': high,
             'medium': medium,
             'low': low,
-            'currency': 'USD',
+            'currency': 'AED',
+            'damage_summary': damage_summary,
         }

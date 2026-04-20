@@ -7,4 +7,5 @@ from . import views
 
 urlpatterns = [
     path('calculate/', views.calculate_valuation, name='calculate-valuation'),
+    path('damage-profile/', views.damage_profile, name='damage-profile'),
 ]

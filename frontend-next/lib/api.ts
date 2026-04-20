@@ -140,6 +140,8 @@ export interface UserProfile {
   request_limit: number;
 }
 
+export type DamageSeverity = "scratch" | "dent" | "replace";
+
 export interface ChangePasswordPayload {
   current_password: string;
   new_password: string;
@@ -219,7 +221,8 @@ export interface ReportRecord {
   medium: number;
   low: number;
   vehicleSnapshot: Record<string, unknown>;
-  damageSelections: unknown[];
+  damageSelections: DamageSelectionPayload[];
+  damageSummary?: DamageSummary | null;
 }
 
 export type CreateReportPayload = Omit<ReportRecord, "id" | "createdAt">;
@@ -493,20 +496,118 @@ export interface ValuationResult {
   avg_mileage: number;
   mileage_delta: number;
   mileage_adjustment: number;
+  base_high: number;
+  base_medium: number;
+  base_low: number;
   high: number;
   medium: number;
   low: number;
   currency: string;
+  damage_summary?: DamageSummary | null;
+}
+
+export interface DamageSource {
+  market: string;
+  title: string;
+  url: string;
+  accessed_on: string;
+}
+
+export interface DamagePricingPart {
+  source_part_id: string;
+  part_family: string;
+  part_family_label: string;
+  market: string;
+  currency: string;
+  vehicle_reference_price_aed: number;
+  repair_scope: string;
+  pricing_mode: string;
+  min_price: number;
+  max_price: number;
+  typical_price: number;
+  part_value_pct_of_vehicle_min: number;
+  part_value_pct_of_vehicle_max: number;
+  part_value_pct_of_vehicle_typical: number;
+  part_value_pct_notes: string;
+  confidence: string;
+  source_count: number;
+  sources: DamageSource[];
+  notes: string;
+}
+
+export interface DamageSelectionPayload {
+  key: string;
+  id: string;
+  label: string;
+  severity: DamageSeverity;
+}
+
+export interface DamageSelectedEntry extends DamagePricingPart {
+  severity: DamageSeverity;
+  severity_label: string;
+  severity_price_multiplier: number;
+  severity_pct_multiplier: number;
+  adjusted_min_price: number;
+  adjusted_max_price: number;
+  adjusted_typical_price: number;
+  adjusted_part_value_pct_min: number;
+  adjusted_part_value_pct_max: number;
+  adjusted_part_value_pct_typical: number;
+}
+
+export interface DamageProfile {
+  generated_at: string;
+  source_document: string;
+  market: string;
+  currency: string;
+  make: string;
+  make_profile: Record<string, unknown> | null;
+  parts: DamagePricingPart[];
+}
+
+export interface DamageSummary {
+  market: string;
+  currency: string;
+  make: string;
+  generated_at: string;
+  source_document: string;
+  selected_part_count: number;
+  unique_part_families: string[];
+  selected_parts: DamagePricingPart[];
+  selected_entries: DamageSelectedEntry[];
+  missing_part_ids: string[];
+  severity_breakdown: Record<DamageSeverity, number>;
+  total_min_price: number;
+  total_max_price: number;
+  total_typical_price: number;
+  total_pct_min: number;
+  total_pct_max: number;
+  total_pct_typical: number;
+  high_adjustment: number;
+  medium_adjustment: number;
+  low_adjustment: number;
 }
 
 export const valuation = {
-  calculate: (vehicleId: number, mileage: number, isNew = false) =>
+  calculate: (
+    vehicleId: number,
+    mileage: number,
+    isNew = false,
+    damageSelections: DamageSelectionPayload[] = [],
+  ) =>
     request<ValuationResult>("/api/valuation/calculate", {
       method: "POST",
       body: JSON.stringify({
         vehicle_id: vehicleId,
         actual_mileage: mileage,
         is_new: isNew,
+        damage_part_ids: damageSelections.map((selection) => selection.id),
+        damage_selections: damageSelections,
       }),
     }),
+
+  damageProfile: (make: string, market = "GCC") =>
+    request<DamageProfile>(
+      `/api/valuation/damage-profile?make=${encodeURIComponent(make)}&market=${encodeURIComponent(market)}`,
+    ),
 };

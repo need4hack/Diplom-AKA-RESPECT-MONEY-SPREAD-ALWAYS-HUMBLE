@@ -9,7 +9,7 @@ function parsePublicFlag(value: string | undefined, fallback = false) {
 }
 
 export const FEATURES = {
-  masters: parsePublicFlag(process.env.NEXT_PUBLIC_ENABLE_MASTERS, true),
+  masters: parsePublicFlag(process.env.NEXT_PUBLIC_ENABLE_MASTERS, false),
 } as const;
 
 export function isFeatureEnabled(feature: keyof typeof FEATURES) {

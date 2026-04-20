@@ -17,7 +17,12 @@ import {
 import { toast } from "sonner";
 import { Loader2, Search, Calculator } from "lucide-react";
 import { useCascade, CASCADE_CHAIN } from "@/hooks/useCascade";
-import { vin as vinApi, valuation as valuationApi, type ValuationResult } from "@/lib/api";
+import {
+  vin as vinApi,
+  valuation as valuationApi,
+  type DamageProfile,
+  type ValuationResult,
+} from "@/lib/api";
 import { usePortalHistory } from "@/contexts/PortalHistoryContext";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import DamageMapSelector, {
@@ -66,6 +71,8 @@ const PORTAL_TEXT = {
     avgMileage: "Средний пробег",
     mileageAdj: "Коррекция пробега",
     yearsShort: "лет",
+    damageAdj: "Учет повреждений",
+    repairEstimate: "Оценка ремонта",
   },
   en: {
     vinLookup: "VIN Lookup",
@@ -108,6 +115,8 @@ const PORTAL_TEXT = {
     avgMileage: "Avg Mileage",
     mileageAdj: "Mileage Adj",
     yearsShort: "yrs",
+    damageAdj: "Damage Adj",
+    repairEstimate: "Repair Estimate",
   },
 } as const;
 
@@ -162,6 +171,8 @@ export default function PortalPage() {
   const [vinLoading, setVinLoading] = useState(false);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationResult, setValuationResult] = useState<ValuationResult | null>(null);
+  const [damageProfile, setDamageProfile] = useState<DamageProfile | null>(null);
+  const [damageProfileLoading, setDamageProfileLoading] = useState(false);
   const damageSelectionsRef = useRef<DamageSelection[]>([]);
 
   /* Load first cascade field (years) on mount */
@@ -175,6 +186,42 @@ export default function PortalPage() {
       setMileage(0);
     }
   }, [isNew]);
+
+  useEffect(() => {
+    const vehicleMake = cascade.foundVehicle?.make;
+    if (!vehicleMake) {
+      setDamageProfile(null);
+      setDamageProfileLoading(false);
+      return;
+    }
+    const resolvedMake = vehicleMake;
+
+    let isMounted = true;
+
+    async function loadDamageProfile() {
+      try {
+        setDamageProfileLoading(true);
+        const profile = await valuationApi.damageProfile(resolvedMake, "GCC");
+        if (isMounted) {
+          setDamageProfile(profile);
+        }
+      } catch {
+        if (isMounted) {
+          setDamageProfile(null);
+        }
+      } finally {
+        if (isMounted) {
+          setDamageProfileLoading(false);
+        }
+      }
+    }
+
+    void loadDamageProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cascade.foundVehicle?.make]);
 
   /* ── VIN Decode ──────────────────────────────────────────── */
 
@@ -241,7 +288,8 @@ export default function PortalPage() {
       const result = await valuationApi.calculate(
         cascade.foundVehicle.id,
         mileage,
-        isNew
+        isNew,
+        damageSelectionsRef.current,
       );
       setValuationResult(result);
       void addEntry({
@@ -264,8 +312,10 @@ export default function PortalPage() {
           valuation: result,
           mileage,
           isNew,
+          damageSummary: result.damage_summary ?? null,
         },
         damageSelections: damageSelectionsRef.current,
+        ...(result.damage_summary ? { damageSummary: result.damage_summary } : {}),
       });
       toast.success(text.valuationCalculated);
     } catch (err: unknown) {
@@ -423,6 +473,8 @@ export default function PortalPage() {
               <CardContent>
                 <DamageMapSelector
                   key={cascade.foundVehicle.id}
+                  pricingProfile={damageProfile}
+                  pricingLoading={damageProfileLoading}
                   onChange={(next) => {
                     damageSelectionsRef.current = next;
                   }}
@@ -521,8 +573,29 @@ export default function PortalPage() {
                       {valuationResult.mileage_delta > 0 ? "-" : "+"}{formatAedPrice(valuationResult.mileage_adjustment)}
                     </Badge>
                   </div>
+                  {valuationResult.damage_summary ? (
+                    <div>
+                      <span className="text-muted-foreground">{text.damageAdj}:</span>{" "}
+                      <Badge variant="destructive">
+                        -{formatAedPrice(valuationResult.damage_summary.medium_adjustment)}
+                      </Badge>
+                    </div>
+                  ) : null}
                 </div>
               )}
+              {valuationResult?.damage_summary ? (
+                <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm">
+                  <p className="font-medium text-amber-700 dark:text-amber-300">
+                    {text.repairEstimate}: {formatAedPrice(valuationResult.damage_summary.total_typical_price)}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700/90 dark:text-amber-200">
+                    {formatAedPrice(valuationResult.damage_summary.total_min_price)} -{" "}
+                    {formatAedPrice(valuationResult.damage_summary.total_max_price)}
+                    {" • "}
+                    {valuationResult.damage_summary.total_pct_typical.toFixed(2)}%
+                  </p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

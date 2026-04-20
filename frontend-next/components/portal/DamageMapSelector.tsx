@@ -1,15 +1,36 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState, type MouseEvent } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/contexts/PreferencesContext";
+import type {
+  DamageProfile,
+  DamagePricingPart,
+  DamageSeverity,
+} from "@/lib/api";
 
 export interface DamageSelection {
   key: string;
   id: string;
   label: string;
+  severity: DamageSeverity;
 }
 
 type DamagePart =
@@ -35,6 +56,29 @@ type DamageViewKey = "front" | "side";
 type DamageMapSelectorProps = {
   initialValue?: DamageSelection[];
   onChange?: (next: DamageSelection[]) => void;
+  pricingProfile?: DamageProfile | null;
+  pricingLoading?: boolean;
+};
+
+const DAMAGE_SEVERITY_META: Record<
+  DamageSeverity,
+  {
+    priceMultiplier: number;
+    pctMultiplier: number;
+  }
+> = {
+  scratch: {
+    priceMultiplier: 0.35,
+    pctMultiplier: 0.2,
+  },
+  dent: {
+    priceMultiplier: 0.65,
+    pctMultiplier: 0.55,
+  },
+  replace: {
+    priceMultiplier: 1,
+    pctMultiplier: 1,
+  },
 };
 
 const DAMAGE_VIEWS: Record<
@@ -158,12 +202,13 @@ const DAMAGE_VIEWS_WITH_LEFT: Record<
 type ExtendedDamageViewKey = keyof typeof DAMAGE_VIEWS_WITH_LEFT;
 
 const DAMAGE_VIEW_KEYS = Object.keys(
-  DAMAGE_VIEWS_WITH_LEFT
+  DAMAGE_VIEWS_WITH_LEFT,
 ) as ExtendedDamageViewKey[];
+
 const DAMAGE_PARTS_BY_ID = new Map(
   DAMAGE_VIEW_KEYS.flatMap((view) =>
-    DAMAGE_VIEWS_WITH_LEFT[view].parts.map((part) => [part.id, part] as const)
-  )
+    DAMAGE_VIEWS_WITH_LEFT[view].parts.map((part) => [part.id, part] as const),
+  ),
 );
 
 function renderPart(
@@ -172,7 +217,8 @@ function renderPart(
   isHovered: boolean,
   onClick: () => void,
   onMouseEnter: () => void,
-  onMouseLeave: () => void
+  onMouseMove: (event: MouseEvent<SVGCircleElement | SVGPathElement>) => void,
+  onMouseLeave: () => void,
 ) {
   const className = cn(
     "cursor-pointer transition-all duration-150",
@@ -180,7 +226,7 @@ function renderPart(
       ? "fill-red-500/45 stroke-red-500"
       : isHovered
         ? "fill-sky-500/30 stroke-sky-500"
-        : "fill-transparent stroke-white/25"
+        : "fill-transparent stroke-white/25",
   );
 
   if (part.element === "circle") {
@@ -194,6 +240,7 @@ function renderPart(
         strokeWidth={isSelected ? 3 : 2}
         onClick={onClick}
         onMouseEnter={onMouseEnter}
+        onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
       />
     );
@@ -208,6 +255,7 @@ function renderPart(
       strokeWidth={isSelected ? 3 : 2}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
     />
   );
@@ -216,28 +264,115 @@ function renderPart(
 function DamageMapSelector({
   initialValue = [],
   onChange,
+  pricingProfile = null,
+  pricingLoading = false,
 }: DamageMapSelectorProps) {
-  const { language } = usePreferences();
+  const { language, formatAedPrice } = usePreferences();
   const [activeView, setActiveView] = useState<ExtendedDamageViewKey>("side");
   const [hoveredPartKey, setHoveredPartKey] = useState<string | null>(null);
+  const [hoverPosition, setHoverPosition] = useState({ x: 12, y: 12 });
   const [viewBoxes, setViewBoxes] = useState<
     Partial<Record<ExtendedDamageViewKey, string>>
   >({});
-  const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(initialValue);
+  const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(
+    () =>
+      initialValue.map((item) => ({
+        ...item,
+        severity: item.severity ?? "replace",
+      })),
+  );
 
   const activeConfig = DAMAGE_VIEWS_WITH_LEFT[activeView];
   const selectedKeys = useMemo(
     () => new Set(selectedItems.map((item) => item.key)),
-    [selectedItems]
+    [selectedItems],
   );
-  const hoveredPart = hoveredPartKey ? DAMAGE_PARTS_BY_ID.get(hoveredPartKey) ?? null : null;
+  const pricingById = useMemo(
+    () =>
+      new Map(
+        (pricingProfile?.parts ?? []).map(
+          (part) => [part.source_part_id, part] as const,
+        ),
+      ),
+    [pricingProfile],
+  );
+  const hoveredPart = hoveredPartKey
+    ? DAMAGE_PARTS_BY_ID.get(hoveredPartKey) ?? null
+    : null;
+  const hoveredPricing = hoveredPartKey
+    ? pricingById.get(hoveredPartKey) ?? null
+    : null;
+
+  const selectedTableRows = useMemo(
+    () =>
+      selectedItems.map((item) => {
+        const pricing = pricingById.get(item.id) ?? null;
+        const severityMeta = DAMAGE_SEVERITY_META[item.severity];
+
+        return {
+          item,
+          pricing,
+          adjustedMinPrice: pricing
+            ? Math.round(pricing.min_price * severityMeta.priceMultiplier)
+            : null,
+          adjustedTypicalPrice: pricing
+            ? Math.round(pricing.typical_price * severityMeta.priceMultiplier)
+            : null,
+          adjustedMaxPrice: pricing
+            ? Math.round(pricing.max_price * severityMeta.priceMultiplier)
+            : null,
+          adjustedTypicalPct: pricing
+            ? Number(
+                (
+                  pricing.part_value_pct_of_vehicle_typical *
+                  severityMeta.pctMultiplier
+                ).toFixed(2),
+              )
+            : null,
+        };
+      }),
+    [pricingById, selectedItems],
+  );
+
+  const selectedPricingSummary = useMemo(() => {
+    return {
+      matchedCount: selectedTableRows.filter((row) => row.pricing).length,
+      totalMinPrice: selectedTableRows.reduce(
+        (sum, row) => sum + (row.adjustedMinPrice ?? 0),
+        0,
+      ),
+      totalTypicalPrice: selectedTableRows.reduce(
+        (sum, row) => sum + (row.adjustedTypicalPrice ?? 0),
+        0,
+      ),
+      totalMaxPrice: selectedTableRows.reduce(
+        (sum, row) => sum + (row.adjustedMaxPrice ?? 0),
+        0,
+      ),
+      totalPctTypical: selectedTableRows.reduce(
+        (sum, row) => sum + (row.adjustedTypicalPct ?? 0),
+        0,
+      ),
+    };
+  }, [selectedTableRows]);
 
   const commitSelection = useCallback(
     (next: DamageSelection[]) => {
       setSelectedItems(next);
       onChange?.(next);
     },
-    [onChange]
+    [onChange],
+  );
+
+  const updateSeverity = useCallback(
+    (selectionKey: string, severity: DamageSeverity) => {
+      commitSelection(
+        selectedItems.map((item) =>
+          item.key === selectionKey ? { ...item, severity } : item,
+        ),
+      );
+    },
+    [commitSelection, selectedItems],
   );
 
   const handleToggle = useCallback(
@@ -256,15 +391,16 @@ function DamageMapSelector({
           key,
           id: part.id,
           label: part.label,
+          severity: "replace",
         },
       ]);
     },
-    [commitSelection, selectedItems]
+    [commitSelection, selectedItems],
   );
 
   function handleImageLoad(
     view: ExtendedDamageViewKey,
-    event: React.SyntheticEvent<HTMLImageElement>
+    event: React.SyntheticEvent<HTMLImageElement>,
   ) {
     const image = event.currentTarget;
     setViewBoxes((current) => ({
@@ -272,6 +408,21 @@ function DamageMapSelector({
       [view]: `0 0 ${image.naturalWidth} ${image.naturalHeight}`,
     }));
   }
+
+  const handleHoverMove = useCallback(
+    (event: MouseEvent<SVGCircleElement | SVGPathElement>) => {
+      const containerBounds = (
+        event.currentTarget.ownerSVGElement?.getBoundingClientRect() ??
+        event.currentTarget.getBoundingClientRect()
+      );
+
+      setHoverPosition({
+        x: event.clientX - containerBounds.left + 14,
+        y: event.clientY - containerBounds.top + 14,
+      });
+    },
+    [],
+  );
 
   const uiText =
     language === "ru"
@@ -285,6 +436,25 @@ function DamageMapSelector({
             "Необязательный шаг. Совпадающие ID остаются связанными между доступными видами.",
           noDamage: "Повреждения не выбраны.",
           remove: "Удалить",
+          estimatedPrice: "Оценка ремонта",
+          estimatedRange: "Диапазон",
+          vehicleShare: "Доля от стоимости авто",
+          pricingLoading: "Загружаем профиль точечного ущерба...",
+          pricingUnavailable:
+            "Для этого авто пока нет профиля ремонтных стоимостей.",
+          selectedSummary: "Суммарное влияние повреждений",
+          severity: "Степень",
+          severityScratch: "Царапина",
+          severityDent: "Вмятина",
+          severityReplace: "Замена",
+          tableTitle: "Выбранные детали в расчете",
+          tableDescription:
+            "Показываем, как каждая деталь влияет на стоимость с учетом выбранной степени.",
+          part: "Деталь",
+          min: "Min",
+          typical: "Typical",
+          max: "Max",
+          share: "Share",
         }
       : {
           rightSide: "Right Side View",
@@ -296,27 +466,52 @@ function DamageMapSelector({
             "Optional step. Matching IDs stay linked across available views.",
           noDamage: "No damage selected.",
           remove: "Remove",
+          estimatedPrice: "Est. repair",
+          estimatedRange: "Range",
+          vehicleShare: "Vehicle share",
+          pricingLoading: "Loading make-specific repair costs...",
+          pricingUnavailable:
+            "Repair-cost profile is not available for this vehicle yet.",
+          selectedSummary: "Estimated total repair impact",
+          severity: "Severity",
+          severityScratch: "Scratch",
+          severityDent: "Dent",
+          severityReplace: "Replace",
+          tableTitle: "Selected parts in damage estimate",
+          tableDescription:
+            "Live estimate for each selected part after applying the chosen severity.",
+          part: "Part",
+          min: "Min",
+          typical: "Typical",
+          max: "Max",
+          share: "Share",
         };
+
+  const severityLabels: Record<DamageSeverity, string> = {
+    scratch: uiText.severityScratch,
+    dent: uiText.severityDent,
+    replace: uiText.severityReplace,
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-              {DAMAGE_VIEW_KEYS.map((view) => (
-                <Button
-                  key={view}
-                  type="button"
-                  variant={activeView === view ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveView(view)}
-                >
-                  {view === "side"
-                    ? uiText.rightSide
-                    : view === "leftSide"
-                      ? uiText.leftSide
-                      : uiText.front}
-                </Button>
-              ))}
+          {DAMAGE_VIEW_KEYS.map((view) => (
+            <Button
+              key={view}
+              type="button"
+              variant={activeView === view ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveView(view)}
+            >
+              {view === "side"
+                ? uiText.rightSide
+                : view === "leftSide"
+                  ? uiText.leftSide
+                  : uiText.front}
+            </Button>
+          ))}
         </div>
         <Button
           type="button"
@@ -329,12 +524,30 @@ function DamageMapSelector({
         </Button>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid gap-4 xl:items-start xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="overflow-auto rounded-xl border border-border bg-muted/20 p-4">
           <div className="relative inline-block max-w-full">
             {hoveredPart && (
-              <div className="absolute left-3 top-3 z-10 rounded-md bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm ring-1 ring-border">
-                {hoveredPart.label}
+              <div
+                className="pointer-events-none absolute z-10 rounded-md bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm ring-1 ring-border"
+                style={{
+                  left: hoverPosition.x,
+                  top: hoverPosition.y,
+                }}
+              >
+                <div>{hoveredPart.label}</div>
+                {hoveredPricing ? (
+                  <div className="mt-1 space-y-0.5 text-[11px] font-normal text-muted-foreground">
+                    <div>
+                      {uiText.estimatedPrice}:{" "}
+                      {formatAedPrice(hoveredPricing.typical_price)}
+                    </div>
+                    <div>
+                      {uiText.vehicleShare}:{" "}
+                      {hoveredPricing.part_value_pct_of_vehicle_typical.toFixed(2)}%
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -343,7 +556,7 @@ function DamageMapSelector({
               alt={`${activeConfig.label} damage map`}
               className={cn(
                 "block h-auto max-w-full rounded-md",
-                activeConfig.imageClassName
+                activeConfig.imageClassName,
               )}
               onLoad={(event) => handleImageLoad(activeView, event)}
             />
@@ -364,7 +577,8 @@ function DamageMapSelector({
                     isHovered,
                     () => handleToggle(part),
                     () => setHoveredPartKey(selectionKey),
-                    () => setHoveredPartKey(null)
+                    handleHoverMove,
+                    () => setHoveredPartKey(null),
                   );
                 })}
               </g>
@@ -372,47 +586,191 @@ function DamageMapSelector({
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-muted/20 p-4">
+        <div className="self-start rounded-xl border border-border bg-muted/20 p-4 xl:max-h-[560px] xl:overflow-hidden">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">{uiText.selectedTitle}</p>
+            <p className="text-sm font-medium text-foreground">
+              {uiText.selectedTitle}
+            </p>
             <p className="text-xs text-muted-foreground">
               {uiText.selectedDescription}
             </p>
           </div>
 
-          {selectedItems.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-              {uiText.noDamage}
-            </div>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {selectedItems.map((item) => (
-                <div
-                  key={item.key}
-                  className="flex items-start justify-between gap-3 rounded-lg border border-red-500/15 bg-red-500/10 px-3 py-2"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.id}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                    onClick={() =>
-                      commitSelection(
-                        selectedItems.filter((selected) => selected.key !== item.key)
-                      )
-                    }
-                    aria-label={`${uiText.remove} ${item.label}`}
+          <div className="mt-4 rounded-lg border border-border bg-background/70 p-3">
+            {pricingLoading ? (
+              <p className="text-sm text-muted-foreground">
+                {uiText.pricingLoading}
+              </p>
+            ) : pricingProfile ? (
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  {uiText.selectedSummary}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {uiText.estimatedPrice}:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatAedPrice(selectedPricingSummary.totalTypicalPrice)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {uiText.estimatedRange}:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatAedPrice(selectedPricingSummary.totalMinPrice)} -{" "}
+                    {formatAedPrice(selectedPricingSummary.totalMaxPrice)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {uiText.vehicleShare}:{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedPricingSummary.totalPctTypical.toFixed(2)}%
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {uiText.pricingUnavailable}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 xl:max-h-[320px] xl:overflow-y-auto">
+            {selectedItems.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                {uiText.noDamage}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedTableRows.map((row) => (
+                  <div
+                    key={row.item.key}
+                    className="flex items-start justify-between gap-3 rounded-lg border border-red-500/15 bg-red-500/10 px-3 py-2"
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {row.item.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{row.item.id}</p>
+                      {row.pricing ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {uiText.estimatedPrice}:{" "}
+                          <span className="font-medium text-foreground">
+                            {formatAedPrice(row.adjustedTypicalPrice ?? 0)}
+                          </span>
+                          {" • "}
+                          {uiText.severity}:{" "}
+                          <span className="font-medium text-foreground">
+                            {severityLabels[row.item.severity]}
+                          </span>
+                          {" • "}
+                          {uiText.vehicleShare}:{" "}
+                          <span className="font-medium text-foreground">
+                            {(row.adjustedTypicalPct ?? 0).toFixed(2)}%
+                          </span>
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                      onClick={() =>
+                        commitSelection(
+                          selectedItems.filter(
+                            (selected) => selected.key !== row.item.key,
+                          ),
+                        )
+                      }
+                      aria-label={`${uiText.remove} ${row.item.label}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {selectedItems.length > 0 ? (
+        <div className="max-h-[420px] overflow-y-auto rounded-xl border border-border bg-muted/20 p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              {uiText.tableTitle}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {uiText.tableDescription}
+            </p>
+          </div>
+
+          <div className="mt-4 overflow-hidden rounded-lg border border-border bg-background">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead>{uiText.part}</TableHead>
+                  <TableHead>{uiText.severity}</TableHead>
+                  <TableHead className="text-right">{uiText.min}</TableHead>
+                  <TableHead className="text-right">{uiText.typical}</TableHead>
+                  <TableHead className="text-right">{uiText.max}</TableHead>
+                  <TableHead className="text-right">{uiText.share}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedTableRows.map((row) => (
+                  <TableRow key={row.item.key}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">
+                          {row.item.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.item.id}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={row.item.severity}
+                        onValueChange={(value) =>
+                          updateSeverity(row.item.key, value as DamageSeverity)
+                        }
+                      >
+                        <SelectTrigger size="sm" className="w-[124px] bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="scratch">
+                            {uiText.severityScratch}
+                          </SelectItem>
+                          <SelectItem value="dent">
+                            {uiText.severityDent}
+                          </SelectItem>
+                          <SelectItem value="replace">
+                            {uiText.severityReplace}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {row.pricing ? formatAedPrice(row.adjustedMinPrice ?? 0) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {row.pricing
+                        ? formatAedPrice(row.adjustedTypicalPrice ?? 0)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {row.pricing ? formatAedPrice(row.adjustedMaxPrice ?? 0) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-foreground">
+                      {row.pricing ? `${(row.adjustedTypicalPct ?? 0).toFixed(2)}%` : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

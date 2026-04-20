@@ -272,13 +272,20 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       await trackAuthenticatedRequest(req);
     }
 
-    const nextResponse = new NextResponse(responseBody, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: {
-        "Content-Type": response.headers.get("Content-Type") || "application/json",
-      },
-    });
+    const nextResponse =
+      response.status === 204
+        ? new NextResponse(null, {
+            status: response.status,
+            statusText: response.statusText,
+          })
+        : new NextResponse(responseBody, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+              "Content-Type":
+                response.headers.get("Content-Type") || "application/json",
+            },
+          });
 
     if (shouldManageSessionCookies(requestPath)) {
       const payload = tryParseJsonObject(responseBody);
