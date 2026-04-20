@@ -28,6 +28,9 @@ urlpatterns = [
     path('backbone/', views.BackboneListView.as_view(), name='backbone'),
     path('backbone/export/', views.BackboneExportView.as_view(), name='backbone-export'),
     path('backbone/bulk/', views.BackboneBulkUpdateView.as_view(), name='backbone-bulk'),
+    path('masters/fields/', views.get_master_fields, name='masters-fields'),
+    path('masters/records/', views.create_master_record, name='masters-records'),
+    path('masters/<str:field_name>/values/', views.master_field_values, name='masters-field-values'),
     path('search/', views.search_vehicles, name='search'),
     path('<int:id>/', views.VehicleDetailView.as_view(), name='detail'),
 

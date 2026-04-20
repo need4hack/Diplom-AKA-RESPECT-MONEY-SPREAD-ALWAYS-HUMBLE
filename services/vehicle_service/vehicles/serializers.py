@@ -53,3 +53,48 @@ class CascadeOptionSerializer(serializers.Serializer):
     [{"value": "BMW"}, {"value": "AUDI"}, ...]
     """
     value = serializers.CharField()
+
+
+class MasterFieldSerializer(serializers.Serializer):
+    """Metadata for a model_db column in the admin masters constructor."""
+    name = serializers.CharField()
+    label = serializers.CharField()
+    data_type = serializers.CharField()
+    editable = serializers.BooleanField()
+
+
+class MasterValueSerializer(serializers.Serializer):
+    """Unique values for a selected model_db column."""
+    value = serializers.JSONField()
+    display_value = serializers.CharField()
+    occurrences = serializers.IntegerField()
+
+
+class MasterValueCreateSerializer(serializers.Serializer):
+    """Payload for creating a new distinct value in a chosen model_db column."""
+    value = serializers.CharField(allow_blank=False, trim_whitespace=True)
+
+
+class MasterRecordCreateSerializer(serializers.Serializer):
+    """Payload for assembling a full model_db vehicle record from master values."""
+    region = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    year = serializers.IntegerField(required=False, allow_null=True)
+    logo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    make = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    model = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    trim = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    body = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    engine = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    transmission = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cylinder = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    doors = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    seats = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    axle = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    mileage = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    depreciation = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    category = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    fuel = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    drivetrain = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    new_price = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    today_price = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    is_active = serializers.BooleanField(required=False, default=True)

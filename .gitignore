@@ -93,3 +93,4 @@ designs
 # Misc
 *.tmp
 *.bak
+scripts/shared-python.path

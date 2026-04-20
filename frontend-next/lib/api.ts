@@ -282,6 +282,43 @@ export interface VehicleOption {
   label?: string;
 }
 
+export interface MasterFieldRecord {
+  name: string;
+  label: string;
+  data_type: string;
+  editable: boolean;
+}
+
+export interface MasterValueRecord {
+  value: string | number | boolean | null;
+  display_value: string;
+  occurrences: number;
+}
+
+export interface MasterRecordPayload {
+  region?: string | null;
+  year?: number | null;
+  logo?: string | null;
+  make?: string | null;
+  model?: string | null;
+  trim?: string | null;
+  body?: string | null;
+  engine?: string | null;
+  transmission?: string | null;
+  cylinder?: number | null;
+  doors?: number | null;
+  seats?: number | null;
+  axle?: number | null;
+  mileage?: string | null;
+  depreciation?: string | null;
+  category?: string | null;
+  fuel?: string | null;
+  drivetrain?: string | null;
+  new_price?: number | null;
+  today_price?: number | null;
+  is_active?: boolean;
+}
+
 export const vehicles = {
   years: () => request<number[]>("/api/vehicles/years"),
 
@@ -353,6 +390,45 @@ export const vehicles = {
     request<{ updated: number }>("/api/vehicles/backbone/bulk/", {
       method: "PATCH",
       body: JSON.stringify({ ids, fields }),
+    }),
+
+  masterFields: () =>
+    request<MasterFieldRecord[]>("/api/vehicles/masters/fields"),
+
+  masterValues: (
+    fieldName: string,
+    page: number,
+    pageSize: number,
+    search?: string,
+  ) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+
+    if (search) {
+      params.append("search", search);
+    }
+
+    return request<{
+      count: number;
+      results: MasterValueRecord[];
+    }>(`/api/vehicles/masters/${fieldName}/values?${params.toString()}`);
+  },
+
+  createMasterValue: (fieldName: string, value: string) =>
+    request<{ id: number; field: string; value: string | number | boolean | null; is_active: boolean }>(
+      `/api/vehicles/masters/${fieldName}/values`,
+      {
+        method: "POST",
+        body: JSON.stringify({ value }),
+      },
+    ),
+
+  createMasterRecord: (data: MasterRecordPayload) =>
+    request<VehicleRecord & Record<string, unknown>>("/api/vehicles/masters/records", {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 };
 

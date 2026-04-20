@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { LanguageCode } from "@/contexts/PreferencesContext";
 import { isPrivilegedRole } from "@/lib/access";
+import { isFeatureEnabled } from "@/lib/features";
 
 export type AppNavItem = {
   href: string;
@@ -96,7 +97,15 @@ function isActivePath(pathname: string, href: string) {
 }
 
 export function getNavItemsForRole(role?: string | null) {
-  return isPrivilegedRole(role) ? ADMIN_NAV_ITEMS : USER_NAV_ITEMS;
+  const navItems = isPrivilegedRole(role) ? ADMIN_NAV_ITEMS : USER_NAV_ITEMS;
+
+  return navItems.filter((item) => {
+    if (item.href === "/masters") {
+      return isFeatureEnabled("masters");
+    }
+
+    return true;
+  });
 }
 
 export function getNavLabel(item: AppNavItem, language: LanguageCode) {
