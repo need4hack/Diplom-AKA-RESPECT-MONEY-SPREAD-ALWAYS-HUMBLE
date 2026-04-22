@@ -22,7 +22,18 @@ class ValuationRequestSerializer(serializers.Serializer):
     """Input validation for POST /api/valuation/calculate/."""
     vehicle_id = serializers.IntegerField(
         help_text='Primary key of the vehicle in model_db.',
+        required=False,
     )
+    year = serializers.IntegerField(required=False, min_value=1900, max_value=2100)
+    make = serializers.CharField(required=False, max_length=100)
+    model = serializers.CharField(required=False, max_length=200)
+    trim = serializers.CharField(required=False, max_length=200, allow_blank=True)
+    body = serializers.CharField(required=False, max_length=100, allow_blank=True)
+    engine = serializers.CharField(required=False, max_length=100, allow_blank=True)
+    transmission = serializers.CharField(required=False, max_length=100, allow_blank=True)
+    drivetrain = serializers.CharField(required=False, max_length=50, allow_blank=True)
+    region = serializers.CharField(required=False, max_length=50, allow_blank=True)
+    category = serializers.CharField(required=False, max_length=100, allow_blank=True)
     actual_mileage = serializers.IntegerField(
         min_value=0,
         help_text='Odometer reading in km.',
@@ -44,6 +55,36 @@ class ValuationRequestSerializer(serializers.Serializer):
         default=list,
         help_text='Selected damaged parts with severity metadata.',
     )
+
+    def validate(self, attrs):
+        vehicle_id = attrs.get("vehicle_id")
+        has_lookup = any(
+            attrs.get(field)
+            for field in ("year", "make", "model", "trim", "body", "engine", "transmission", "drivetrain", "region", "category")
+        )
+
+        if vehicle_id is None:
+            missing_required = [
+                field for field in ("year", "make", "model")
+                if not attrs.get(field)
+            ]
+            if missing_required:
+                raise serializers.ValidationError(
+                    {
+                        "vehicle_id": (
+                            "Provide either vehicle_id or a vehicle lookup with "
+                            "year, make, and model."
+                        ),
+                        "missing_fields": missing_required,
+                    }
+                )
+
+        if vehicle_id is not None and has_lookup:
+            # Keep the contract deterministic: explicit ID wins over lookup fields.
+            for field in ("year", "make", "model", "trim", "body", "engine", "transmission", "drivetrain", "region", "category"):
+                attrs.pop(field, None)
+
+        return attrs
 
 
 class DamageSourceSerializer(serializers.Serializer):
@@ -143,5 +184,6 @@ class ValuationResultSerializer(serializers.Serializer):
     medium = serializers.IntegerField()
     low = serializers.IntegerField()
     currency = serializers.CharField()
+    resolved_by = serializers.ChoiceField(choices=("vehicle_id", "lookup"))
     damage_summary = DamageSummarySerializer(required=False, allow_null=True)
     api_usage = serializers.DictField(required=False)

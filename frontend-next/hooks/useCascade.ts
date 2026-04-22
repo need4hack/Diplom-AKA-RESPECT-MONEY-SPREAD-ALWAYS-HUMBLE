@@ -42,6 +42,140 @@ function normalize(str: unknown): string {
   return MAKE_ALIASES[s] || s;
 }
 
+function normalizeCompact(str: unknown): string {
+  return normalize(str).replace(/\s+/g, "");
+}
+
+function stripTrimDecorators(str: unknown): string {
+  return normalize(str)
+    .replace(/\b(4m|4matic|4 motion|xdrive|quattro|awd|fwd|rwd|4wd|2wd|4x4|4x2)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeEngineValue(str: unknown): string {
+  const normalizedValue = normalize(str);
+  return normalizedValue
+    .replace(/\b(l|liter|liters)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getDrivetrainCandidates(str: unknown): string[] {
+  const normalizedValue = normalize(str);
+  const candidates = new Set<string>([
+    normalizedValue,
+    normalizedValue.replace(/\s+/g, ""),
+  ]);
+
+  const addGroup = (values: string[]) => {
+    values.forEach((value) => {
+      candidates.add(value);
+      candidates.add(value.replace(/\s+/g, ""));
+    });
+  };
+
+  if (/(awd|all wheel drive|4wd|4x4|four wheel drive)/.test(normalizedValue)) {
+    addGroup(["awd", "4wd", "4x4", "all wheel drive"]);
+  }
+
+  if (/(fwd|front wheel drive)/.test(normalizedValue)) {
+    addGroup(["fwd", "front wheel drive", "2wd", "4x2"]);
+  }
+
+  if (/(rwd|rear wheel drive)/.test(normalizedValue)) {
+    addGroup(["rwd", "rear wheel drive", "2wd", "4x2"]);
+  }
+
+  if (/(2wd|4x2|two wheel drive)/.test(normalizedValue)) {
+    addGroup(["2wd", "4x2", "fwd", "rwd", "awd"]);
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+function extractEngineDisplacement(str: unknown): string {
+  const source = String(str ?? "").trim();
+  const match = source.match(/\d+(?:[.,]\d+)?/);
+  return match ? match[0].replace(",", ".") : "";
+}
+
+function getMatchCandidates(fieldKey: string, value: string): string[] {
+  const normalizedValue = normalize(value);
+  const compactValue = normalizeCompact(value);
+  const candidates = new Set<string>([normalizedValue, compactValue]);
+
+  if (fieldKey === "trim") {
+    const stripped = stripTrimDecorators(value);
+    const strippedCompact = stripped.replace(/\s+/g, "");
+    if (stripped) {
+      candidates.add(stripped);
+    }
+    if (strippedCompact) {
+      candidates.add(strippedCompact);
+    }
+
+    const hyphenHead = String(value).split("-")[0]?.trim();
+    if (hyphenHead) {
+      candidates.add(normalize(hyphenHead));
+      candidates.add(normalizeCompact(hyphenHead));
+    }
+  }
+
+  if (fieldKey === "engine") {
+    const normalizedEngine = normalizeEngineValue(value);
+    const compactEngine = normalizedEngine.replace(/\s+/g, "");
+    const numericDisplacement = extractEngineDisplacement(value);
+    if (normalizedEngine) {
+      candidates.add(normalizedEngine);
+    }
+    if (compactEngine) {
+      candidates.add(compactEngine);
+    }
+    if (numericDisplacement) {
+      candidates.add(numericDisplacement);
+      candidates.add(numericDisplacement.replace(/\./g, ""));
+      candidates.add(`${numericDisplacement} l`);
+      candidates.add(`${numericDisplacement}l`);
+    }
+  }
+
+  if (fieldKey === "drivetrain") {
+    getDrivetrainCandidates(value).forEach((candidate) => candidates.add(candidate));
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+function findBestAutoFillOption(fieldKey: string, targetVal: string, optionValues: string[]): string | null {
+  const targetCandidates = getMatchCandidates(fieldKey, targetVal);
+
+  for (const option of optionValues) {
+    const optionCandidates = getMatchCandidates(fieldKey, option);
+    if (optionCandidates.some((candidate) => targetCandidates.includes(candidate))) {
+      return option;
+    }
+  }
+
+  for (const option of optionValues) {
+    const optionNormalized = normalize(option);
+    const optionCompact = normalizeCompact(option);
+    const hasMatch = targetCandidates.some(
+      (candidate) =>
+        optionNormalized.includes(candidate) ||
+        candidate.includes(optionNormalized) ||
+        optionCompact.includes(candidate) ||
+        candidate.includes(optionCompact)
+    );
+
+    if (hasMatch) {
+      return option;
+    }
+  }
+
+  return null;
+}
+
 function getAutoFillTarget(fieldKey: string, v: NonNullable<VinDecodeResponse["vehicle"]>): string | null {
   let val: unknown = null;
   switch (fieldKey) {
@@ -176,13 +310,7 @@ export function useCascade(): CascadeState {
         if (autoFillData) {
           const targetVal = getAutoFillTarget(key, autoFillData);
           if (targetVal) {
-            const matched = optionValues.find((opt) => {
-              const optN = normalize(opt);
-              return (
-                optN === targetVal ||
-                (key === "make" && (optN.includes(targetVal) || targetVal.includes(optN)))
-              );
-            });
+            const matched = findBestAutoFillOption(key, targetVal, optionValues);
 
             if (matched) {
               // SYNC UPDATE

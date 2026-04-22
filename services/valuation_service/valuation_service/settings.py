@@ -4,13 +4,23 @@ Django settings for valuation_service project.
 
 from pathlib import Path
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-valuation-dev-key-change-in-production')
-DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+DEFAULT_SECRET_KEY = 'unsafe-valuation-dev-key-change-me'
+
+SECRET_KEY = config('SECRET_KEY', default=DEFAULT_SECRET_KEY)
+DEBUG = config('DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
+    if host.strip()
+]
+
+if not DEBUG and SECRET_KEY == DEFAULT_SECRET_KEY:
+    raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is disabled.')
 
 # --------------- Application definition ---------------
 
@@ -99,7 +109,15 @@ SIMPLE_JWT = {
 
 # --------------- CORS ---------------
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://127.0.0.1:3000,http://localhost:3000',
+    ).split(',')
+    if origin.strip()
+]
 
 # --------------- Internal service URLs ---------------
 

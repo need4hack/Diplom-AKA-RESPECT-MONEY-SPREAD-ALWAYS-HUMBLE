@@ -454,7 +454,19 @@ class VinDecoderService:
         year_from_vin = VinDecoderService.decode_year_from_vin(vin_upper)
         manufacturer = VinDecoderService.decode_manufacturer(vin_upper)
 
-        # Step 3: Search local database
+        # Step 3: Query NHTSA first
+        nhtsa_record = VinDecoderService.search_nhtsa(vin_upper)
+        if nhtsa_record:
+            return {
+                'vin': vin_upper,
+                'is_valid': True,
+                'manufacturer': manufacturer or nhtsa_record.get('make'),
+                'year_from_vin': year_from_vin or nhtsa_record.get('modelyear'),
+                'source': 'nhtsa_api',
+                'vehicle': nhtsa_record,
+            }
+
+        # Step 4: Search local database
         record = VinDecoderService.search_local(vin_upper, year_from_vin)
         if record:
             return {
@@ -466,7 +478,7 @@ class VinDecoderService:
                 'vehicle': record,
             }
 
-        # Step 4: Search VDS Extended
+        # Step 5: Search VDS Extended
         vds_ext_record = VinDecoderService.search_vds_extended(vin_upper)
         if vds_ext_record:
             vds_ext_record.vin = vin_upper  # override so frontend sees requested VIN
@@ -479,7 +491,7 @@ class VinDecoderService:
                 'vehicle': vds_ext_record,
             }
 
-        # Step 5: Search VDS
+        # Step 6: Search VDS
         vds_record = VinDecoderService.search_vds(vin_upper)
         if vds_record:
             vds_record.vin = vin_upper
@@ -490,18 +502,6 @@ class VinDecoderService:
                 'year_from_vin': year_from_vin,
                 'source': 'local_db_vds',
                 'vehicle': vds_record,
-            }
-
-        # Step 6: Fallback to NHTSA API
-        nhtsa_record = VinDecoderService.search_nhtsa(vin_upper)
-        if nhtsa_record:
-            return {
-                'vin': vin_upper,
-                'is_valid': True,
-                'manufacturer': manufacturer or nhtsa_record.get('make'),
-                'year_from_vin': year_from_vin or nhtsa_record.get('modelyear'),
-                'source': 'nhtsa_api',
-                'vehicle': nhtsa_record,
             }
 
         # Step 7: Fallback WMI + Year only (nothing found)

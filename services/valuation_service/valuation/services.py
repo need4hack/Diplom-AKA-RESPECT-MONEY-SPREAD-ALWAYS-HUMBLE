@@ -43,6 +43,54 @@ def _parse_key(raw_value: str) -> str:
     return raw_value.strip().split('(')[0].strip().split()[0]
 
 
+def _normalize_text(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value).strip().lower())
+
+
+def _normalize_compact(value: Optional[str]) -> str:
+    return re.sub(r"\s+", "", _normalize_text(value))
+
+
+def _normalize_engine(value: Optional[str]) -> str:
+    normalized = _normalize_text(value)
+    normalized = re.sub(r"\b(l|liter|liters)\b", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _extract_engine_displacement(value: Optional[str]) -> str:
+    match = re.search(r"\d+(?:[.,]\d+)?", str(value or ""))
+    return match.group(0).replace(",", ".") if match else ""
+
+
+def _normalize_trim(value: Optional[str]) -> str:
+    normalized = _normalize_text(value)
+    normalized = re.sub(
+        r"\b(4m|4matic|4 motion|xdrive|quattro|awd|fwd|rwd|4wd|2wd|4x4|4x2)\b",
+        " ",
+        normalized,
+    )
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _drivetrain_aliases(value: Optional[str]) -> set[str]:
+    normalized = _normalize_text(value)
+    aliases = {normalized, normalized.replace(" ", "")}
+
+    if re.search(r"(awd|all wheel drive|4wd|4x4|four wheel drive)", normalized):
+        aliases.update({"awd", "4wd", "4x4", "all wheel drive"})
+    if re.search(r"(fwd|front wheel drive)", normalized):
+        aliases.update({"fwd", "front wheel drive", "2wd", "4x2"})
+    if re.search(r"(rwd|rear wheel drive)", normalized):
+        aliases.update({"rwd", "rear wheel drive", "2wd", "4x2"})
+    if re.search(r"(2wd|4x2|two wheel drive)", normalized):
+        aliases.update({"2wd", "4x2", "fwd", "rwd", "awd"})
+
+    return {alias for alias in aliases if alias}
+
+
 class ValuationError(Exception):
     """Raised when valuation cannot be computed due to missing data."""
     pass
@@ -85,6 +133,133 @@ class ValuationService:
                 f'Vehicle {vehicle} has no year — cannot calculate age.'
             )
         return vehicle
+
+    @staticmethod
+    def _field_score(expected: Optional[str], actual: Optional[str], *, mode: str = "text") -> int:
+        if not expected:
+            return 0
+
+        if mode == "engine":
+            expected_norm = _normalize_engine(expected)
+            actual_norm = _normalize_engine(actual)
+            expected_num = _extract_engine_displacement(expected)
+            actual_num = _extract_engine_displacement(actual)
+
+            if expected_norm and expected_norm == actual_norm:
+                return 5
+            if expected_num and expected_num == actual_num:
+                return 4
+            if expected_num and actual_norm and expected_num in actual_norm:
+                return 2
+            return -4
+
+        if mode == "trim":
+            expected_norm = _normalize_trim(expected)
+            actual_norm = _normalize_trim(actual)
+            if expected_norm and expected_norm == actual_norm:
+                return 5
+            if expected_norm and actual_norm and (
+                expected_norm in actual_norm or actual_norm in expected_norm
+            ):
+                return 3
+            return -3
+
+        if mode == "drivetrain":
+            expected_aliases = _drivetrain_aliases(expected)
+            actual_aliases = _drivetrain_aliases(actual)
+            if expected_aliases and expected_aliases.intersection(actual_aliases):
+                return 4
+            return -2
+
+        expected_norm = _normalize_text(expected)
+        actual_norm = _normalize_text(actual)
+        if expected_norm and expected_norm == actual_norm:
+            return 4
+        if expected_norm and actual_norm and (
+            expected_norm in actual_norm or actual_norm in expected_norm
+        ):
+            return 1
+        return -2
+
+    @staticmethod
+    def resolve_vehicle(
+        *,
+        year: int,
+        make: str,
+        model: str,
+        trim: Optional[str] = None,
+        body: Optional[str] = None,
+        engine: Optional[str] = None,
+        transmission: Optional[str] = None,
+        drivetrain: Optional[str] = None,
+        region: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> ModelDB:
+        """
+        Resolve a vehicle from model_db using a constrained, deterministic lookup.
+
+        Required fields:
+        - year
+        - make
+        - model
+
+        Optional fields improve ranking. We do not allow completely broad lookup
+        because that would be ambiguous and unsafe for external clients.
+        """
+        queryset = ModelDB.objects.filter(
+            is_active=True,
+            year=year,
+            make__iexact=make,
+            model__iexact=model,
+        )
+
+        if region:
+            queryset = queryset.filter(region__iexact=region)
+        if body:
+            queryset = queryset.filter(body__iexact=body)
+        if transmission:
+            queryset = queryset.filter(transmission__iexact=transmission)
+        if category:
+            queryset = queryset.filter(category__iexact=category)
+
+        candidates = list(queryset[:200])
+        if not candidates:
+            raise ValuationError(
+                "Vehicle lookup did not match any active model_db record. "
+                "Provide a valid vehicle_id or refine year/make/model."
+            )
+
+        if len(candidates) == 1 and not any([trim, engine, drivetrain]):
+            return candidates[0]
+
+        scored_candidates: list[tuple[int, int, ModelDB]] = []
+        for candidate in candidates:
+            score = 0
+            score += ValuationService._field_score(trim, candidate.trim, mode="trim")
+            score += ValuationService._field_score(engine, candidate.engine, mode="engine")
+            score += ValuationService._field_score(drivetrain, candidate.drivetrain, mode="drivetrain")
+            score += ValuationService._field_score(body, candidate.body)
+            score += ValuationService._field_score(transmission, candidate.transmission)
+            score += ValuationService._field_score(region, candidate.region)
+            score += ValuationService._field_score(category, candidate.category)
+            scored_candidates.append((score, candidate.id, candidate))
+
+        scored_candidates.sort(key=lambda item: (-item[0], item[1]))
+        best_score, _, best_candidate = scored_candidates[0]
+
+        if len(scored_candidates) > 1 and best_score == scored_candidates[1][0]:
+            raise ValuationError(
+                "Vehicle lookup is ambiguous. Refine the request with trim, engine, "
+                "drivetrain, or use an explicit vehicle_id."
+            )
+
+        if best_score < 0:
+            raise ValuationError(
+                "Vehicle lookup did not produce a confident match. Provide a vehicle_id "
+                "or refine trim/engine/drivetrain."
+            )
+
+        return best_candidate
 
     @staticmethod
     def get_depreciation_schedule(vehicle: ModelDB) -> Depreciation:
@@ -131,12 +306,13 @@ class ValuationService:
 
     @staticmethod
     def calculate(
-        vehicle_id: int,
+        vehicle_id: Optional[int],
         actual_mileage: int,
         is_new: bool = False,
         valuation_year: Optional[int] = None,
         damage_part_ids: Optional[list[str]] = None,
         damage_selections: Optional[list[dict]] = None,
+        vehicle_lookup: Optional[dict] = None,
     ) -> dict:
         """
         Main valuation pipeline.
@@ -153,7 +329,16 @@ class ValuationService:
             mileage_adjustment, high, medium, low, currency.
         """
         # 1. Fetch vehicle
-        vehicle = ValuationService.get_vehicle(vehicle_id)
+        resolved_by = "vehicle_id"
+        if vehicle_id is not None:
+            vehicle = ValuationService.get_vehicle(vehicle_id)
+        elif vehicle_lookup:
+            vehicle = ValuationService.resolve_vehicle(**vehicle_lookup)
+            vehicle_id = vehicle.id
+            resolved_by = "lookup"
+        else:
+            raise ValuationError("Provide either vehicle_id or vehicle lookup fields.")
+
         today_price = vehicle.today_price
         new_price = vehicle.new_price or 0
 
@@ -277,4 +462,5 @@ class ValuationService:
             'low': low,
             'currency': 'AED',
             'damage_summary': damage_summary,
+            'resolved_by': resolved_by,
         }

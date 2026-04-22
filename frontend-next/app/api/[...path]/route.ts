@@ -230,6 +230,8 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       }
     }
 
+    headers.set("X-Carspecs-Request-Source", "website");
+
     let requestBody: string | undefined;
     if (req.method !== "GET" && req.method !== "HEAD") {
       requestBody = await req.text();
@@ -258,6 +260,7 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       await appendRequestLog({
         timestamp: new Date().toISOString(),
         service,
+        source: "website",
         method: req.method,
         path: requestPath,
         status: response.status,
@@ -304,6 +307,7 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       await appendRequestLog({
         timestamp: new Date().toISOString(),
         service,
+        source: "website",
         method: req.method,
         path: requestPath,
         status: 502,

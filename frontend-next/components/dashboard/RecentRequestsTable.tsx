@@ -114,6 +114,9 @@ const TEXT = {
     resetRange: "Сбросить диапазон",
     time: "Время",
     user: "Пользователь",
+    source: "РСЃС‚РѕС‡РЅРёРє",
+    sourceWebsite: "РЎР°Р№С‚",
+    sourceApi: "API",
     endpoint: "Endpoint",
     duration: "Длительность",
     noMatches: "Нет API-запросов, подходящих под текущие фильтры.",
@@ -143,6 +146,9 @@ const TEXT = {
     resetRange: "Reset range",
     time: "Time",
     user: "User",
+    source: "Source",
+    sourceWebsite: "Website",
+    sourceApi: "API",
     endpoint: "Endpoint",
     duration: "Duration",
     noMatches: "No API requests matched the current filters.",
@@ -235,10 +241,11 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
   }, [currentPage, filteredRequests]);
 
   function handleExportCsv() {
-    const header = ["timestamp", "user", "role", "method", "endpoint", "status", "duration_ms", "service"];
+    const header = ["timestamp", "source", "user", "role", "method", "endpoint", "status", "duration_ms", "service"];
 
     const rows = filteredRequests.map((request) => [
       request.timestamp,
+      request.source,
       request.user,
       request.role ?? "",
       request.method,
@@ -267,6 +274,10 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
     setToDate("");
     setToTime("");
     setPage(1);
+  }
+
+  function getSourceLabel(source: RequestActivityItem["source"]) {
+    return source === "external_api" ? text.sourceApi : text.sourceWebsite;
   }
 
   return (
@@ -440,6 +451,7 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
           <TableRow className="border-border">
             <TableHead>{text.time}</TableHead>
             <TableHead>{text.user}</TableHead>
+            <TableHead>{text.source}</TableHead>
             <TableHead>{text.method}</TableHead>
             <TableHead>{text.endpoint}</TableHead>
             <TableHead>{text.status}</TableHead>
@@ -449,7 +461,7 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
         <TableBody>
           {paginatedRequests.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-sm text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-sm text-muted-foreground">
                 {text.noMatches}
               </TableCell>
             </TableRow>
@@ -466,6 +478,11 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
                       {request.role ?? text.noRole}
                     </span>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={request.source === "external_api" ? "secondary" : "outline"}>
+                    {getSourceLabel(request.source)}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant={getMethodBadgeVariant(request.method)}>{request.method}</Badge>

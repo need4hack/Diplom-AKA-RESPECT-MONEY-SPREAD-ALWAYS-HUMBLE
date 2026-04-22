@@ -4,6 +4,7 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 export type LoggedService = "auth" | "vehicles" | "vin" | "valuation";
+export type RequestSource = "website" | "external_api";
 
 type CountSet = {
   today: number;
@@ -15,6 +16,7 @@ type CountSet = {
 export type RequestLogEntry = {
   timestamp: string;
   service: LoggedService;
+  source?: RequestSource;
   method: string;
   path: string;
   status: number;
@@ -37,6 +39,7 @@ export type DashboardStatsResponse = {
 export type RequestActivityItem = {
   id: string;
   timestamp: string;
+  source: RequestSource;
   endpoint: string;
   method: string;
   status: number;
@@ -255,6 +258,7 @@ export async function getDashboardActivity(
   const recentRequests = logsForActivity.map((log, index) => ({
     id: `${log.timestamp}-${log.method}-${log.path}-${index}`,
     timestamp: log.timestamp,
+    source: log.source ?? "website",
     endpoint: log.path,
     method: log.method,
     status: log.status,
