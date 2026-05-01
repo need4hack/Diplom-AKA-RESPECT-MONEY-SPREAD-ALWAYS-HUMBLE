@@ -232,15 +232,23 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
 
     headers.set("X-Carspecs-Request-Source", "website");
 
-    let requestBody: string | undefined;
+    let requestBody: BodyInit | undefined;
     if (req.method !== "GET" && req.method !== "HEAD") {
-      requestBody = await req.text();
+      const contentType = req.headers.get("content-type")?.toLowerCase() ?? "";
 
-      if (requestPath === "/api/auth/refresh/" && !hasRefreshTokenInBody(requestBody)) {
-        const refreshToken = req.cookies.get(REFRESH_COOKIE)?.value;
-        if (refreshToken) {
-          requestBody = JSON.stringify({ refresh: refreshToken });
-          headers.set("Content-Type", "application/json");
+      if (contentType.includes("multipart/form-data")) {
+        requestBody = await req.formData();
+        headers.delete("Content-Type");
+      } else {
+        const rawTextBody = await req.text();
+        requestBody = rawTextBody;
+
+        if (requestPath === "/api/auth/refresh/" && !hasRefreshTokenInBody(rawTextBody)) {
+          const refreshToken = req.cookies.get(REFRESH_COOKIE)?.value;
+          if (refreshToken) {
+            requestBody = JSON.stringify({ refresh: refreshToken });
+            headers.set("Content-Type", "application/json");
+          }
         }
       }
     }

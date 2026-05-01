@@ -1,6 +1,13 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState, type MouseEvent } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,6 +66,32 @@ type DamageMapSelectorProps = {
   pricingProfile?: DamageProfile | null;
   pricingLoading?: boolean;
 };
+
+function normalizeSelections(value?: DamageSelection[]): DamageSelection[] {
+  return (value ?? []).map((item) => ({
+    ...item,
+    severity: item.severity ?? "replace",
+  }));
+}
+
+function areSelectionsEqual(
+  left: DamageSelection[],
+  right: DamageSelection[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => {
+    const other = right[index];
+    return (
+      item.key === other.key &&
+      item.id === other.id &&
+      item.label === other.label &&
+      item.severity === other.severity
+    );
+  });
+}
 
 const DAMAGE_SEVERITY_META: Record<
   DamageSeverity,
@@ -262,7 +295,7 @@ function renderPart(
 }
 
 function DamageMapSelector({
-  initialValue = [],
+  initialValue,
   onChange,
   pricingProfile = null,
   pricingLoading = false,
@@ -274,13 +307,21 @@ function DamageMapSelector({
   const [viewBoxes, setViewBoxes] = useState<
     Partial<Record<ExtendedDamageViewKey, string>>
   >({});
-  const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(
-    () =>
-      initialValue.map((item) => ({
-        ...item,
-        severity: item.severity ?? "replace",
-      })),
+  const normalizedInitialValue = useMemo(
+    () => normalizeSelections(initialValue),
+    [initialValue],
   );
+  const [selectedItems, setSelectedItems] = useState<DamageSelection[]>(
+    () => normalizedInitialValue,
+  );
+
+  useEffect(() => {
+    setSelectedItems((current) =>
+      areSelectionsEqual(current, normalizedInitialValue)
+        ? current
+        : normalizedInitialValue,
+    );
+  }, [normalizedInitialValue]);
 
   const activeConfig = DAMAGE_VIEWS_WITH_LEFT[activeView];
   const selectedKeys = useMemo(

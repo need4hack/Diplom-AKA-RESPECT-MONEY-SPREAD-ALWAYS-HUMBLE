@@ -16,6 +16,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from .services import AuthService, AuthError
 from .backends import CustomRefreshToken
 from .serializers import (
+    AvatarUpdateSerializer,
     AdminApiKeySerializer,
     AdminUserCreateSerializer,
     AdminUserSerializer,
@@ -197,6 +198,27 @@ def change_password(request):
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({'ok': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def avatar(request):
+    """
+    POST /api/auth/avatar/
+    DELETE /api/auth/avatar/
+    """
+    if request.method == 'DELETE':
+        user = AuthService.remove_avatar(request.user.id)
+        return Response(UserProfileSerializer(user).data, status=status.HTTP_200_OK)
+
+    serializer = AvatarUpdateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    user = AuthService.update_avatar(
+        request.user.id,
+        serializer.validated_data['avatar'],
+    )
+    return Response(UserProfileSerializer(user).data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

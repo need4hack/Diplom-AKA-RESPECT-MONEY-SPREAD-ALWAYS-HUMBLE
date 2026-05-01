@@ -89,9 +89,11 @@ autoru_scraper/*.csv
 autoru_scraper/scraper.log
 autoru_fast_scraper/
 designs
+new-chat
 
 # Misc
 *.tmp
 *.bak
 scripts/shared-python.path
-listing_search
+# listing_search
+отчет

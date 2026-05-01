@@ -124,6 +124,18 @@ CORS_ALLOWED_ORIGINS = [
 VEHICLE_SERVICE_URL = config('VEHICLE_SERVICE_URL', default='http://127.0.0.1:8001')
 VIN_SERVICE_URL = config('VIN_SERVICE_URL', default='http://127.0.0.1:8002')
 
+# --------------- Listing search ---------------
+
+LISTING_SEARCH_SITES = [
+    item.strip()
+    for item in config('LISTING_SEARCH_SITES', default='autoru,drom,bid.cars').split(',')
+    if item.strip()
+]
+LISTING_SEARCH_LIMIT_PER_SITE = config('LISTING_SEARCH_LIMIT_PER_SITE', default=4, cast=int)
+LISTING_SEARCH_USE_BROWSER = config('LISTING_SEARCH_USE_BROWSER', default=False, cast=bool)
+LISTING_SEARCH_HEADLESS = config('LISTING_SEARCH_HEADLESS', default=True, cast=bool)
+LISTING_SEARCH_PROXY = config('LISTING_SEARCH_PROXY', default='')
+
 # --------------- i18n ---------------
 
 LANGUAGE_CODE = 'ru-ru'

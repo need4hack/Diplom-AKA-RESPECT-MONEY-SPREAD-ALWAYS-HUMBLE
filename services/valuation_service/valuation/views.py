@@ -19,8 +19,11 @@ from rest_framework.response import Response
 
 from .authentication import ApiKeyAuthentication, ServiceJWTAuthentication
 from .damage_catalog import get_damage_profile
+from .listing_search_service import ListingSearchBridge
 from .serializers import (
     DamageProfileSerializer,
+    ListingSearchRequestSerializer,
+    ListingSearchResponseSerializer,
     ValuationRequestSerializer,
     ValuationResultSerializer,
 )
@@ -170,6 +173,35 @@ def damage_profile(request):
         _append_external_request_log(
             request,
             path="/api/valuation/damage-profile/",
+            status=getattr(response, "status_code", 500),
+            duration_ms=duration_ms,
+        )
+
+
+@api_view(["POST"])
+@authentication_classes([ServiceJWTAuthentication, ApiKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def search_listings(request):
+    started_at = time.perf_counter()
+    response = None
+
+    try:
+        serializer = ListingSearchRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = ListingSearchBridge.search(serializer.validated_data)
+        response = Response(ListingSearchResponseSerializer(payload).data)
+        return response
+    except DRFValidationError as exc:
+        response = Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
+        return response
+    except ValuationError as exc:
+        response = Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return response
+    finally:
+        duration_ms = round((time.perf_counter() - started_at) * 1000)
+        _append_external_request_log(
+            request,
+            path="/api/valuation/listings/",
             status=getattr(response, "status_code", 500),
             duration_ms=duration_ms,
         )

@@ -36,6 +36,8 @@ class User(models.Model):
     password_hash = models.TextField()
     role = models.CharField(max_length=20, default='user')
     api_key = models.CharField(max_length=64, blank=True, null=True)
+    avatar_data = models.TextField(blank=True, null=True)
+    avatar_key = models.CharField(max_length=255, blank=True, null=True)
     request_limit = models.IntegerField(default=1000)
     request_count = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

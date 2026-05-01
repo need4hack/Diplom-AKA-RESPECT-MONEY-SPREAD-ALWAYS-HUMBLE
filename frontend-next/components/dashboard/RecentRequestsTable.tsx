@@ -114,8 +114,8 @@ const TEXT = {
     resetRange: "Сбросить диапазон",
     time: "Время",
     user: "Пользователь",
-    source: "РСЃС‚РѕС‡РЅРёРє",
-    sourceWebsite: "РЎР°Р№С‚",
+    source: "Источник",
+    sourceWebsite: "Сайт",
     sourceApi: "API",
     endpoint: "Endpoint",
     duration: "Длительность",
@@ -160,6 +160,8 @@ const TEXT = {
 export default function RecentRequestsTable({ requests }: RecentRequestsTableProps) {
   const { language } = usePreferences();
   const text = TEXT[language];
+  const sourceHeaderLabel = language === "ru" ? "Источник" : "Source";
+  const sourceWebsiteLabel = language === "ru" ? "Вебсайт" : "Website";
 
   const [page, setPage] = useState(1);
   const [userFilter, setUserFilter] = useState("");
@@ -277,7 +279,7 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
   }
 
   function getSourceLabel(source: RequestActivityItem["source"]) {
-    return source === "external_api" ? text.sourceApi : text.sourceWebsite;
+    return source === "external_api" ? text.sourceApi : sourceWebsiteLabel;
   }
 
   return (
@@ -451,7 +453,7 @@ export default function RecentRequestsTable({ requests }: RecentRequestsTablePro
           <TableRow className="border-border">
             <TableHead>{text.time}</TableHead>
             <TableHead>{text.user}</TableHead>
-            <TableHead>{text.source}</TableHead>
+            <TableHead>{sourceHeaderLabel}</TableHead>
             <TableHead>{text.method}</TableHead>
             <TableHead>{text.endpoint}</TableHead>
             <TableHead>{text.status}</TableHead>

@@ -15,7 +15,18 @@ class DamageSelectionInputSerializer(serializers.Serializer):
         choices=("scratch", "dent", "replace"),
         required=False,
         default="replace",
-    )
+    ) 
+
+
+class ListingSearchRequestSerializer(serializers.Serializer):
+    year = serializers.IntegerField(min_value=1900, max_value=2100)
+    make = serializers.CharField(max_length=100)
+    model = serializers.CharField(max_length=200)
+    trim = serializers.CharField(required=False, allow_blank=True, default="", max_length=200)
+    body = serializers.CharField(required=False, allow_blank=True, default="", max_length=100)
+    engine = serializers.CharField(required=False, allow_blank=True, default="", max_length=100)
+    transmission = serializers.CharField(required=False, allow_blank=True, default="", max_length=100)
+    drivetrain = serializers.CharField(required=False, allow_blank=True, default="", max_length=50)
 
 
 class ValuationRequestSerializer(serializers.Serializer):
@@ -137,6 +148,46 @@ class DamageProfileSerializer(serializers.Serializer):
     make = serializers.CharField()
     make_profile = serializers.JSONField(allow_null=True)
     parts = DamagePartSerializer(many=True)
+
+
+class ListingItemSerializer(serializers.Serializer):
+    site = serializers.CharField()
+    title = serializers.CharField()
+    url = serializers.URLField()
+    price_rub = serializers.IntegerField(allow_null=True)
+    price_text = serializers.CharField(allow_blank=True)
+    image_url = serializers.CharField(allow_blank=True)
+    photos = serializers.ListField(child=serializers.CharField(), default=list)
+    summary = serializers.CharField(allow_blank=True)
+    search_url = serializers.CharField(allow_blank=True)
+    matched_via = serializers.CharField(allow_blank=True)
+    year = serializers.IntegerField(allow_null=True)
+    mileage_km = serializers.IntegerField(allow_null=True)
+    city = serializers.CharField(allow_blank=True)
+    trim = serializers.CharField(allow_blank=True)
+    engine = serializers.CharField(allow_blank=True)
+    power_hp = serializers.IntegerField(allow_null=True)
+    transmission = serializers.CharField(allow_blank=True)
+    drivetrain = serializers.CharField(allow_blank=True)
+    color = serializers.CharField(allow_blank=True)
+    owners_count = serializers.IntegerField(allow_null=True)
+    steering_wheel = serializers.CharField(allow_blank=True)
+    generation = serializers.CharField(allow_blank=True)
+    score = serializers.IntegerField()
+
+
+class ListingProviderRunSerializer(serializers.Serializer):
+    site = serializers.CharField()
+    ok = serializers.BooleanField()
+    search_urls = serializers.ListField(child=serializers.CharField(), default=list)
+    error = serializers.CharField(allow_blank=True)
+    results = ListingItemSerializer(many=True)
+
+
+class ListingSearchResponseSerializer(serializers.Serializer):
+    query = serializers.JSONField()
+    providers = ListingProviderRunSerializer(many=True)
+    results = ListingItemSerializer(many=True)
 
 
 class DamageSummarySerializer(serializers.Serializer):

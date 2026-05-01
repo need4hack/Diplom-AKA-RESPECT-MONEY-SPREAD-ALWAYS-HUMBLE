@@ -4,7 +4,10 @@ Serializers for Auth Service.
 Validates input and structures output for REST API responses.
 """
 
+from django.core.files.storage import default_storage
 from rest_framework import serializers
+
+MAX_AVATAR_BYTES = 1024 * 1024
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -40,10 +43,34 @@ class UserProfileSerializer(serializers.Serializer):
     email = serializers.CharField()
     role = serializers.CharField()
     api_key = serializers.CharField(allow_null=True, allow_blank=True, required=False)
+    avatar_url = serializers.SerializerMethodField()
     request_limit = serializers.IntegerField()
     request_count = serializers.IntegerField()
     is_active = serializers.BooleanField()
     created_at = serializers.DateTimeField()
+
+    def get_avatar_url(self, obj):
+        avatar_key = getattr(obj, "avatar_key", None)
+        if avatar_key:
+            try:
+                return default_storage.url(avatar_key)
+            except Exception:
+                return None
+
+        # Backward compatibility for already saved base64 avatars before storage migration.
+        return getattr(obj, "avatar_data", None) or None
+
+
+class AvatarUpdateSerializer(serializers.Serializer):
+    """Input validation for POST /api/auth/avatar/."""
+
+    avatar = serializers.ImageField(allow_empty_file=False)
+
+    def validate_avatar(self, value):
+        if value.size > MAX_AVATAR_BYTES:
+            raise serializers.ValidationError('Avatar image must be 1 MB or smaller.')
+
+        return value
 
 
 class TokenResponseSerializer(serializers.Serializer):

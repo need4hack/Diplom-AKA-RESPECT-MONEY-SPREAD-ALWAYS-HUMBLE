@@ -9,11 +9,14 @@ Separation of concerns (promt.md §7):
 import hashlib
 import logging
 import secrets
+import uuid
+from pathlib import Path
 from typing import Optional
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
 from django.db.models import F
 
 from .models import Report, User
@@ -295,6 +298,54 @@ class AuthService:
 
         user.api_key = secrets.token_hex(32)
         user.save(update_fields=['api_key'])
+        return user
+
+    @staticmethod
+    def _build_avatar_key(user_id, original_name: str) -> str:
+        extension = Path(original_name or "").suffix.lower()
+        allowed_extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+        if extension not in allowed_extensions:
+            extension = ".png"
+
+        return f"users/{user_id}/avatars/{uuid.uuid4().hex}{extension}"
+
+    @staticmethod
+    def update_avatar(user_id, uploaded_file) -> User:
+        """Store avatar file in configured storage and save only the object key in DB."""
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        old_avatar_key = getattr(user, 'avatar_key', None)
+        avatar_key = AuthService._build_avatar_key(user_id, getattr(uploaded_file, 'name', ''))
+
+        stored_key = default_storage.save(avatar_key, uploaded_file)
+
+        if old_avatar_key and old_avatar_key != stored_key:
+            default_storage.delete(old_avatar_key)
+
+        user.avatar_key = stored_key
+        user.avatar_data = None
+        user.save(update_fields=['avatar_key', 'avatar_data'])
+        return user
+
+    @staticmethod
+    def remove_avatar(user_id) -> User:
+        """Delete avatar file from storage and clear avatar fields."""
+        try:
+            user = User.objects.get(pk=user_id, is_active=True)
+        except User.DoesNotExist:
+            raise AuthError('User not found.')
+
+        old_avatar_key = getattr(user, 'avatar_key', None)
+        if old_avatar_key:
+            default_storage.delete(old_avatar_key)
+
+        user.avatar_key = None
+        user.avatar_data = None
+        user.save(update_fields=['avatar_key', 'avatar_data'])
         return user
 
     @staticmethod

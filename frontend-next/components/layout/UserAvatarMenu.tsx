@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useMemo, useRef, useState } from "react";
 import { Camera, KeyRound, LogOut, Settings, Upload } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/api";
@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
+const MAX_AVATAR_BYTES = 1024 * 1024;
+
 const TEXT = {
   ru: {
     settings: "Настройки",
@@ -41,8 +43,11 @@ const TEXT = {
     passwordUpdated: "Пароль обновлен.",
     saving: "Сохранение...",
     close: "Закрыть",
-    avatarSaved: "Аватар сохранен локально для этого пользователя.",
+    avatarSaved: "Аватар сохранен.",
     avatarRemoved: "Аватар удален.",
+    avatarTooLarge: "Изображение должно быть не больше 1 МБ.",
+    avatarUploadFailed: "Не удалось сохранить аватар.",
+    passwordUpdateFailed: "Не удалось обновить пароль.",
   },
   en: {
     settings: "Settings",
@@ -60,14 +65,13 @@ const TEXT = {
     passwordUpdated: "Password updated.",
     saving: "Saving...",
     close: "Close",
-    avatarSaved: "Avatar saved locally for this user.",
+    avatarSaved: "Avatar saved.",
     avatarRemoved: "Avatar removed.",
+    avatarTooLarge: "The image must be 1 MB or smaller.",
+    avatarUploadFailed: "Failed to save avatar.",
+    passwordUpdateFailed: "Failed to update password.",
   },
 } as const;
-
-function getAvatarStorageKey(userId: string) {
-  return `carspecs-avatar:${userId}`;
-}
 
 function getInitials(username?: string | null) {
   if (!username) {
@@ -83,32 +87,36 @@ function getInitials(username?: string | null) {
     .slice(0, 2);
 }
 
+function getErrorDetail(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "detail" in error &&
+    typeof error.detail === "string" &&
+    error.detail.trim()
+  ) {
+    return error.detail;
+  }
+
+  return fallback;
+}
+
 export default function UserAvatarMenu({
   language,
 }: {
   language: "ru" | "en";
 }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
   const text = TEXT[language];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [openSettings, setOpenSettings] = useState(false);
-  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-
-  useEffect(() => {
-    if (!user || typeof window === "undefined") {
-      setAvatarSrc(null);
-      return;
-    }
-
-    const storedAvatar = window.localStorage.getItem(getAvatarStorageKey(user.id));
-    setAvatarSrc(storedAvatar);
-  }, [user]);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
 
   const initials = useMemo(() => getInitials(user?.username), [user?.username]);
 
@@ -116,41 +124,53 @@ export default function UserAvatarMenu({
     return null;
   }
 
-  const userId = user.id;
   const username = user.username;
   const email = user.email;
+  const avatarSrc = user.avatar_url ?? null;
 
-  function handleAvatarSelect(event: ChangeEvent<HTMLInputElement>) {
+  async function handleAvatarSelect(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file || typeof window === "undefined") {
+    event.target.value = "";
+
+    if (!file) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : null;
-      if (!result) {
-        return;
-      }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setSettingsMessage(null);
+      setSettingsError(text.avatarTooLarge);
+      return;
+    }
 
-      window.localStorage.setItem(getAvatarStorageKey(userId), result);
-      setAvatarSrc(result);
+    try {
+      setIsSavingAvatar(true);
       setSettingsError(null);
+      setSettingsMessage(null);
+      await auth.updateAvatar(file);
+      await refreshProfile();
       setSettingsMessage(text.avatarSaved);
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
+    } catch (error) {
+      setSettingsMessage(null);
+      setSettingsError(getErrorDetail(error, text.avatarUploadFailed));
+    } finally {
+      setIsSavingAvatar(false);
+    }
   }
 
-  function handleRemoveAvatar() {
-    if (typeof window === "undefined") {
-      return;
+  async function handleRemoveAvatar() {
+    try {
+      setIsSavingAvatar(true);
+      setSettingsError(null);
+      setSettingsMessage(null);
+      await auth.removeAvatar();
+      await refreshProfile();
+      setSettingsMessage(text.avatarRemoved);
+    } catch (error) {
+      setSettingsMessage(null);
+      setSettingsError(getErrorDetail(error, text.avatarUploadFailed));
+    } finally {
+      setIsSavingAvatar(false);
     }
-
-    window.localStorage.removeItem(getAvatarStorageKey(userId));
-    setAvatarSrc(null);
-    setSettingsError(null);
-    setSettingsMessage(text.avatarRemoved);
   }
 
   async function handlePasswordUpdate() {
@@ -170,15 +190,8 @@ export default function UserAvatarMenu({
       setConfirmPassword("");
       setSettingsMessage(text.passwordUpdated);
     } catch (error) {
-      const detail =
-        typeof error === "object" &&
-        error !== null &&
-        "detail" in error &&
-        typeof error.detail === "string"
-          ? error.detail
-          : "Failed to update password.";
-
-      setSettingsError(detail);
+      setSettingsMessage(null);
+      setSettingsError(getErrorDetail(error, text.passwordUpdateFailed));
     } finally {
       setIsSavingPassword(false);
     }
@@ -261,11 +274,18 @@ export default function UserAvatarMenu({
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isSavingAvatar}
                     >
                       <Upload className="size-4" />
-                      {text.uploadAvatar}
+                      {isSavingAvatar ? text.saving : text.uploadAvatar}
                     </Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleRemoveAvatar}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleRemoveAvatar()}
+                      disabled={isSavingAvatar || !avatarSrc}
+                    >
                       <Camera className="size-4" />
                       {text.removeAvatar}
                     </Button>
@@ -273,7 +293,7 @@ export default function UserAvatarMenu({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
                     className="hidden"
                     onChange={handleAvatarSelect}
                   />

@@ -10,6 +10,7 @@ urlpatterns = [
     path('login/', views.login, name='auth-login'),
     path('refresh/', views.refresh_token, name='auth-refresh'),
     path('me/', views.me, name='auth-me'),
+    path('avatar/', views.avatar, name='auth-avatar'),
     path('change-password/', views.change_password, name='auth-change-password'),
     path('track-request/', views.track_request, name='auth-track-request'),
     path('users/', views.users, name='auth-users'),

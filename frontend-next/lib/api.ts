@@ -47,8 +47,12 @@ function getErrorDetail(body: Record<string, unknown>, fallback: string) {
 
 function buildRequestHeaders(init?: RequestInit): Headers {
   const headers = new Headers(init?.headers ?? {});
+  const isFormDataBody =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
 
-  if (!headers.has("Content-Type")) {
+  if (isFormDataBody) {
+    headers.delete("Content-Type");
+  } else if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -136,6 +140,7 @@ export interface UserProfile {
   email: string;
   role: string;
   api_key: string | null;
+  avatar_url?: string | null;
   request_count: number;
   request_limit: number;
 }
@@ -194,6 +199,21 @@ export const auth = {
     request<{ ok: boolean }>("/api/auth/change-password", {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  updateAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    return request<UserProfile>("/api/auth/avatar", {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  removeAvatar: () =>
+    request<UserProfile>("/api/auth/avatar", {
+      method: "DELETE",
     }),
 
   logout: () =>
@@ -588,6 +608,57 @@ export interface DamageSummary {
   low_adjustment: number;
 }
 
+export interface ListingSearchRequest {
+  year: number;
+  make: string;
+  model: string;
+  trim?: string;
+  body?: string;
+  engine?: string;
+  transmission?: string;
+  drivetrain?: string;
+}
+
+export interface ListingSearchItem {
+  site: string;
+  title: string;
+  url: string;
+  price_rub: number | null;
+  price_text: string;
+  image_url: string;
+  photos: string[];
+  summary: string;
+  search_url: string;
+  matched_via: string;
+  year: number | null;
+  mileage_km: number | null;
+  city: string;
+  trim: string;
+  engine: string;
+  power_hp: number | null;
+  transmission: string;
+  drivetrain: string;
+  color: string;
+  owners_count: number | null;
+  steering_wheel: string;
+  generation: string;
+  score: number;
+}
+
+export interface ListingSearchProviderRun {
+  site: string;
+  ok: boolean;
+  search_urls: string[];
+  error: string;
+  results: ListingSearchItem[];
+}
+
+export interface ListingSearchResponse {
+  query: ListingSearchRequest;
+  providers: ListingSearchProviderRun[];
+  results: ListingSearchItem[];
+}
+
 export const valuation = {
   calculate: (
     vehicleId: number,
@@ -610,4 +681,10 @@ export const valuation = {
     request<DamageProfile>(
       `/api/valuation/damage-profile?make=${encodeURIComponent(make)}&market=${encodeURIComponent(market)}`,
     ),
+
+  listings: (data: ListingSearchRequest) =>
+    request<ListingSearchResponse>("/api/valuation/listings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

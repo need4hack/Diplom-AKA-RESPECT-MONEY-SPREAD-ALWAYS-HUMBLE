@@ -15,12 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Search, Calculator } from "lucide-react";
+import { ExternalLink, Loader2, Search, Calculator } from "lucide-react";
 import { useCascade, CASCADE_CHAIN } from "@/hooks/useCascade";
 import {
   vin as vinApi,
   valuation as valuationApi,
   type DamageProfile,
+  type ListingSearchItem,
+  type ListingSearchResponse,
   type ValuationResult,
 } from "@/lib/api";
 import { usePortalHistory } from "@/contexts/PortalHistoryContext";
@@ -28,6 +30,87 @@ import { usePreferences } from "@/contexts/PreferencesContext";
 import DamageMapSelector, {
   type DamageSelection,
 } from "@/components/portal/DamageMapSelector";
+
+function shouldHideListingProviderError(error?: string): boolean {
+  if (!error) {
+    return false;
+  }
+
+  const normalized = error.toLowerCase();
+  return (
+    normalized.includes("403") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("showcaptcha") ||
+    normalized.includes("captcha")
+  );
+}
+
+type ListingMarketKey = "american" | "russian" | "arabian" | "other";
+
+const LISTING_MARKET_ORDER: ListingMarketKey[] = ["american", "russian", "arabian", "other"];
+
+const LISTING_MARKET_SITE_MAP: Record<ListingMarketKey, string[]> = {
+  american: ["bid.cars"],
+  russian: ["drom", "autoru"],
+  arabian: [],
+  other: [],
+};
+
+function getListingMarketKey(site: string): ListingMarketKey {
+  const normalizedSite = site.trim().toLowerCase();
+
+  for (const market of LISTING_MARKET_ORDER) {
+    if (LISTING_MARKET_SITE_MAP[market].includes(normalizedSite)) {
+      return market;
+    }
+  }
+
+  return "other";
+}
+
+function getListingMarketLabel(language: "ru" | "en", market: ListingMarketKey): string {
+  if (language === "ru") {
+    switch (market) {
+      case "american":
+        return "Американский рынок";
+      case "russian":
+        return "Русский рынок";
+      case "arabian":
+        return "Арабский рынок";
+      default:
+        return "Другие источники";
+    }
+  }
+
+  switch (market) {
+    case "american":
+      return "American market";
+    case "russian":
+      return "Russian market";
+    case "arabian":
+      return "Arab market";
+    default:
+      return "Other sources";
+  }
+}
+
+function groupListingsByMarket(listings: ListingSearchItem[]) {
+  const groups = new Map<ListingMarketKey, ListingSearchItem[]>();
+
+  for (const listing of listings) {
+    const market = getListingMarketKey(listing.site);
+    const current = groups.get(market) ?? [];
+    current.push(listing);
+    groups.set(market, current);
+  }
+
+  return LISTING_MARKET_ORDER
+    .map((market) => ({
+      market,
+      listings: groups.get(market) ?? [],
+    }))
+    .filter((group) => group.listings.length > 0);
+}
 
 const PORTAL_TEXT = {
   ru: {
@@ -153,10 +236,10 @@ const PORTAL_FIELD_TEXT = {
   },
 } as const;
 
-/* ─── helpers ─────────────────────────────────────────────── */
+/* в”Ђв”Ђв”Ђ helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
 
-/* ─── page component ──────────────────────────────────────── */
+/* в”Ђв”Ђв”Ђ page component в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
 export default function PortalPage() {
   const cascade = useCascade();
@@ -173,6 +256,8 @@ export default function PortalPage() {
   const [valuationResult, setValuationResult] = useState<ValuationResult | null>(null);
   const [damageProfile, setDamageProfile] = useState<DamageProfile | null>(null);
   const [damageProfileLoading, setDamageProfileLoading] = useState(false);
+  const [listingSearchResult, setListingSearchResult] = useState<ListingSearchResponse | null>(null);
+  const [listingSearchLoading, setListingSearchLoading] = useState(false);
   const damageSelectionsRef = useRef<DamageSelection[]>([]);
 
   /* Load first cascade field (years) on mount */
@@ -186,6 +271,19 @@ export default function PortalPage() {
       setMileage(0);
     }
   }, [isNew]);
+
+  useEffect(() => {
+    setListingSearchResult(null);
+    setListingSearchLoading(false);
+  }, [cascade.foundVehicle?.id]);
+
+  useEffect(() => {
+    damageSelectionsRef.current = [];
+  }, [cascade.foundVehicle?.id]);
+
+  useEffect(() => {
+    setValuationResult(null);
+  }, [cascade.foundVehicle?.id]);
 
   useEffect(() => {
     const vehicleMake = cascade.foundVehicle?.make;
@@ -223,7 +321,7 @@ export default function PortalPage() {
     };
   }, [cascade.foundVehicle?.make]);
 
-  /* ── VIN Decode ──────────────────────────────────────────── */
+  /* в”Ђв”Ђ VIN Decode в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
   async function handleVinDecode() {
     const vinClean = vinValue.trim().toUpperCase();
@@ -274,7 +372,7 @@ export default function PortalPage() {
     }
   }
 
-  /* ── Valuation ───────────────────────────────────────────── */
+  /* в”Ђв”Ђ Valuation в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
   async function handleValuate() {
     if (!cascade.foundVehicle) {
@@ -282,11 +380,15 @@ export default function PortalPage() {
       return;
     }
 
+    const foundVehicle = cascade.foundVehicle;
+
     setValuationLoading(true);
+    setListingSearchLoading(true);
+    setListingSearchResult(null);
 
     try {
       const result = await valuationApi.calculate(
-        cascade.foundVehicle.id,
+        foundVehicle.id,
         mileage,
         isNew,
         damageSelectionsRef.current,
@@ -295,10 +397,10 @@ export default function PortalPage() {
       void addEntry({
         vin: vinValue.trim().toUpperCase(),
         vehicleId: result.vehicle_id,
-        year: cascade.foundVehicle.year,
-        make: cascade.foundVehicle.make,
-        model: cascade.foundVehicle.model,
-        trim: cascade.foundVehicle.trim,
+        year: foundVehicle.year,
+        make: foundVehicle.make,
+        model: foundVehicle.model,
+        trim: foundVehicle.trim,
         mileage,
         isNew,
         damageCount: damageSelectionsRef.current.length,
@@ -308,7 +410,7 @@ export default function PortalPage() {
         medium: result.medium,
         low: result.low,
         vehicleSnapshot: {
-          foundVehicle: cascade.foundVehicle,
+          foundVehicle,
           valuation: result,
           mileage,
           isNew,
@@ -317,6 +419,26 @@ export default function PortalPage() {
         damageSelections: damageSelectionsRef.current,
         ...(result.damage_summary ? { damageSummary: result.damage_summary } : {}),
       });
+      void valuationApi
+        .listings({
+          year: foundVehicle.year,
+          make: foundVehicle.make,
+          model: foundVehicle.model,
+        })
+        .then((listings) => {
+          setListingSearchResult(listings);
+        })
+        .catch((listingErr: unknown) => {
+          const listingError = listingErr as { detail?: string };
+          toast.error(
+            language === "ru"
+              ? `Не удалось загрузить объявления: ${listingError?.detail || "Unknown error"}`
+              : `Failed to load listings: ${listingError?.detail || "Unknown error"}`
+          );
+        })
+        .finally(() => {
+          setListingSearchLoading(false);
+        });
       toast.success(text.valuationCalculated);
     } catch (err: unknown) {
       const error = err as { detail?: string };
@@ -326,13 +448,13 @@ export default function PortalPage() {
     }
   }
 
-  /* ── Render ──────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Render в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
 
-        {/* ── Left sidebar: VIN + Mileage ──────────────────── */}
+        {/* в”Ђв”Ђ Left sidebar: VIN + Mileage в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -381,10 +503,10 @@ export default function PortalPage() {
           </Card>
         </div>
 
-        {/* ── Right content: Cascade + Valuation ───────────── */}
+        {/* в”Ђв”Ђ Right content: Cascade + Valuation в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
         <div className="space-y-6">
 
-          {/* Vehicle Details — cascade grid */}
+          {/* Vehicle Details ? cascade grid */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">{text.vehicleDetails}</CardTitle>
@@ -451,7 +573,7 @@ export default function PortalPage() {
                     {cascade.foundVehicle.model} {cascade.foundVehicle.trim}
                   </p>
                   <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300">
-                    ID: {cascade.foundVehicle.id} • {text.today}: {formatAedPrice(cascade.foundVehicle.today_price)} • {text.newPrice}: {formatAedPrice(cascade.foundVehicle.new_price)}
+                    ID: {cascade.foundVehicle.id}  {text.today}: {formatAedPrice(cascade.foundVehicle.today_price)}  {text.newPrice}: {formatAedPrice(cascade.foundVehicle.new_price)}
                   </p>
                 </div>
               )}
@@ -591,13 +713,219 @@ export default function PortalPage() {
                   <p className="mt-1 text-xs text-amber-700/90 dark:text-amber-200">
                     {formatAedPrice(valuationResult.damage_summary.total_min_price)} -{" "}
                     {formatAedPrice(valuationResult.damage_summary.total_max_price)}
-                    {" • "}
+                    {"  "}
                     {valuationResult.damage_summary.total_pct_typical.toFixed(2)}%
                   </p>
                 </div>
               ) : null}
             </CardContent>
           </Card>
+
+          {(listingSearchLoading || listingSearchResult) && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div>
+                  <CardTitle className="text-sm font-medium">
+                    {language === "ru" ? "Похожие объявления" : "Comparable Listings"}
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {language === "ru"
+                      ? "Объявления из внешних источников после расчета оценки."
+                      : "Marketplace listings loaded after valuation."}
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {listingSearchLoading ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <Skeleton key={index} className="h-[220px] w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : listingSearchResult && listingSearchResult.results.length > 0 ? (
+                  <div className="space-y-4">
+                    {false ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {listingSearchResult!.results.map((listing) => (
+                        <div
+                          key={`${listing.site}-${listing.url}`}
+                          className="overflow-hidden rounded-xl border border-border bg-card"
+                        >
+                          <div className="aspect-[16/10] bg-muted">
+                            {listing.image_url ? (
+                              <img
+                                src={listing.image_url}
+                                alt={listing.title}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                {listing.site}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-3 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <Badge variant="outline">{listing.site}</Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Score {listing.score}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="line-clamp-2 font-medium text-foreground">
+                                {listing.title}
+                              </p>
+                              <p className="mt-1 text-lg font-semibold text-foreground">
+                                {language === "ru" ? "Цена" : "Price"}:{" "}
+                                {listing.price_rub != null
+                                  ? `RUB ${listing.price_rub.toLocaleString("en-US")}`
+                                  : listing.price_text || "N/A"}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                              <span>
+                                {language === "ru" ? "Город" : "City"}: {listing.city || "—"}
+                              </span>
+                              <span>
+                                {language === "ru" ? "Пробег" : "Mileage"}:{" "}
+                                {listing.mileage_km != null
+                                  ? `${listing.mileage_km.toLocaleString("en-US")} km`
+                                  : "?"}
+                              </span>
+                              <span>
+                                {language === "ru" ? "Владельцы" : "Owners"}:{" "}
+                                {listing.owners_count != null ? listing.owners_count : "—"}
+                              </span>
+                              <span>{listing.year ?? "—"}</span>
+                            </div>
+                            {listing.summary ? (
+                              <p className="line-clamp-3 text-xs text-muted-foreground">
+                                {listing.summary}
+                              </p>
+                            ) : null}
+                            <Button asChild variant="outline" className="w-full">
+                              <a href={listing.url} target="_blank" rel="noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                {language === "ru" ? "Открыть объявление" : "Open listing"}
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    ) : (
+                      <>
+                        {groupListingsByMarket(listingSearchResult!.results).map((group) => (
+                          <div key={group.market} className="space-y-3">
+                            <p className="text-sm font-semibold text-foreground">
+                              {getListingMarketLabel(language, group.market)}:
+                            </p>
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                              {group.listings.map((listing) => (
+                                <div
+                                  key={`${listing.site}-${listing.url}`}
+                                  className="overflow-hidden rounded-xl border border-border bg-card"
+                                >
+                                  <div className="aspect-[16/10] bg-muted">
+                                    {listing.image_url ? (
+                                      <img
+                                        src={listing.image_url}
+                                        alt={listing.title}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                        {listing.site}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="space-y-3 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <Badge variant="outline">{listing.site}</Badge>
+                                      <span className="text-xs text-muted-foreground">
+                                        Score {listing.score}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="line-clamp-2 font-medium text-foreground">
+                                        {listing.title}
+                                      </p>
+                                      <p className="mt-1 text-lg font-semibold text-foreground">
+                                        {language === "ru" ? "Цена" : "Price"}:{" "}
+                                        {listing.price_rub != null
+                                          ? `RUB ${listing.price_rub.toLocaleString("en-US")}`
+                                          : listing.price_text || "N/A"}
+                                      </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                      <span>
+                                        {language === "ru" ? "Город" : "City"}: {listing.city || "—"}
+                                      </span>
+                                      <span>
+                                        {language === "ru" ? "Пробег" : "Mileage"}:{" "}
+                                        {listing.mileage_km != null
+                                          ? `${listing.mileage_km.toLocaleString("en-US")} km`
+                                          : "—"}
+                                      </span>
+                                      <span>
+                                        {language === "ru" ? "Владельцы" : "Owners"}:{" "}
+                                        {listing.owners_count != null ? listing.owners_count : "—"}
+                                      </span>
+                                      <span>{listing.year ?? "—"}</span>
+                                    </div>
+                                    {listing.summary ? (
+                                      <p className="line-clamp-3 text-xs text-muted-foreground">
+                                        {listing.summary}
+                                      </p>
+                                    ) : null}
+                                    <Button asChild variant="outline" className="w-full">
+                                      <a href={listing.url} target="_blank" rel="noreferrer">
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        {language === "ru" ? "Открыть объявление" : "Open listing"}
+                                      </a>
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {listingSearchResult.providers.some(
+                      (provider) => !provider.ok && !shouldHideListingProviderError(provider.error)
+                    ) ? (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {listingSearchResult.providers
+                          .filter(
+                            (provider) =>
+                              !provider.ok && !shouldHideListingProviderError(provider.error)
+                          )
+                          .map((provider) => (
+                            <div
+                              key={provider.site}
+                              className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
+                            >
+                              <span className="font-medium">{provider.site}</span>:{" "}
+                              {provider.error ||
+                                (language === "ru"
+                                  ? "Источник временно недоступен"
+                                  : "Source unavailable")}
+                            </div>
+                          ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {language === "ru"
+                      ? "По данному авто объявления пока не найдены."
+                      : "No listings were found for this vehicle yet."}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
         </div>
       </div>
